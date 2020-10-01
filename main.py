@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 rc('text', usetex=True)
 
 #%%
@@ -18,19 +18,17 @@ plt.scatter(x, y, s=area, c=colors, alpha=0.5)
 plt.show()
 
 #%%
-X = np.linspace(-np.pi, np.pi, 256,endpoint=True)
-C,S = np.cos(X), np.sin(X)
+X = np.linspace(-np.pi, np.pi, 256, endpoint=True)
+C, S = np.cos(X), np.sin(X)
 
 plt.figure()
 plt.plot(X, C, color="blue", linewidth=2.5, linestyle="-")
 plt.plot(X, S, color="red", linewidth=2.5, linestyle="-")
 
 plt.xlim(X.min()*1.1, X.max()*1.1)
-plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi],
-[r'$-\pi$', r'$-\pi/2$', r'$0$', r'$+\pi/2$', r'$+\pi$'])
+plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', r'$0$', r'$+\pi/2$', r'$+\pi$'])
 
-plt.ylim(C.min()*1.1,C.max()*1.1)
-plt.yticks([-1, 0, +1],
-[r'$-1$', r'$0$', r'$+1$'])
+plt.ylim(C.min()*1.1, C.max()*1.1)
+plt.yticks([-1, 0, +1], [r'$-1$', r'$0$', r'$+1$'])
 
 plt.show()
