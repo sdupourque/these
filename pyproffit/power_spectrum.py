@@ -378,7 +378,7 @@ class PowerSpectrum(object):
         self.size = img.shape
         self.mask = mask
         fmod[0].data = mask
-        fmod.writeto('mask.fits', overwrite=True)
+        fmod.writeto('tmp/mask.fits', overwrite=True)
         # Simulate perfect model with Poisson noise
         randmod = np.random.poisson(modimg[miny:maxy, minx:maxx])
         simmod = np.nan_to_num(np.divide(randmod, modimg[miny:maxy, minx:maxx]))
@@ -394,9 +394,9 @@ class PowerSpectrum(object):
             convimg, convmod = calc_mexicanhat(sc, img, mask, simmod)
             # Save image
             fmod[0].data = convimg
-            fmod.writeto('conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
+            fmod.writeto('tmp/conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
             fmod[0].data = convmod
-            fmod.writeto('conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
+            fmod.writeto('tmp/conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
         fmod.close()
 
     #
@@ -427,7 +427,7 @@ class PowerSpectrum(object):
         ######################
         # Define the region where the power spectrum will be extracted
         ######################
-        fmask = fits.open('mask.fits')
+        fmask = fits.open('tmp/mask.fits')
         mask = fmask[0].data
         data_size = mask.shape
         fmask.close()
@@ -444,10 +444,10 @@ class PowerSpectrum(object):
         nreg = 20  # Number of subregions for bootstrap calculation
         for i in range(nsc):
             # Read images
-            fco = fits.open('conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))))
+            fco = fits.open('tmp/conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))))
             convimg = fco[0].data.astype(float)
             fco.close()
-            fmod = fits.open('conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))))
+            fmod = fits.open('tmp/conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))))
             convmod = fmod[0].data.astype(float)
             fmod.close()
             logging.info('PS: Computing the power at scale {} kpc'.format(sckpc[i]))
