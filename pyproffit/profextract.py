@@ -345,7 +345,11 @@ class Profile(object):
                 self.nbin = nbin
             else:
                 nbin = int(self.maxrad / self.binsize * 60. + 0.5)
-                self.bins = np.arange(self.binsize / 60. / 2., (nbin + 0.5) * self.binsize / 60., self.binsize / 60.)
+
+                low = self.binsize / 60. / 2.
+                up = (nbin + 0.5) * self.binsize / 60.
+
+                self.bins = np.arange(low, up, (up-low)/nbin)
                 self.ebins = np.ones(nbin) * self.binsize / 60. / 2.
                 self.nbin = nbin
         else:
@@ -460,6 +464,8 @@ class Profile(object):
             self.counts = counts
             self.bkgprof = bkgprof
             self.bkgcounts = bkgcounts
+
+        assert self.bins.shape == self.profile.shape
 
 
     def MedianSB(self):
