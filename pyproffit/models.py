@@ -1,6 +1,14 @@
 import numpy as np
 import pymc3 as pm
 
+parameter_bounds = {}
+
+parameter_bounds['BetaModel'] = (np.array([-5, 0, -np.inf, -np.inf]),
+                                 np.array([5, np.inf, np.inf, np.inf]))
+
+parameter_bounds['Vikhlinin'] = (np.array([0, 0, 0, 0, 0, 0, -np.inf, -np.inf]),
+                                 np.array([5, 0.1, 10, 100, 5, 5, np.inf, np.inf]))
+
 def BetaModel(x, beta, rc, norm, bkg):
     """
     Single Beta model
@@ -229,7 +237,7 @@ class Model(object):
         Constructor of class Model
         """
         self.model=model
-
+        self.low_bounds, self.high_bounds = parameter_bounds[model.__name__]
         npar = model.__code__.co_argcount
 
         self.npar = npar - 1
