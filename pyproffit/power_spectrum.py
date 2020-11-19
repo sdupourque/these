@@ -590,7 +590,7 @@ class PowerSpectrum(object):
         else:
             logging.error('ProjectionFactor: Invalid number of SB parameters')
             return
-        fmask = fits.open('mask.fits')
+        fmask = fits.open('tmp/mask.fits')
         mask = fmask[0].data
         data_size = mask.shape
         fmask.close()
