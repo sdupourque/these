@@ -1,5 +1,4 @@
 import numpy as np
-import logging
 from astropy.io import fits
 from astropy import wcs
 from scipy.ndimage.filters import gaussian_filter
@@ -18,22 +17,22 @@ def get_extnum(fitsfile):
     if fitsfile[0].header['NAXIS'] == 2:
         return 0
     else:
-        logging.info('get_extnum: Primary HDU is not an image, moving on')
+        print('Primary HDU is not an image, moving on')
         nhdu = len(fitsfile)
         if nhdu == 1:
-            logging.error('get_extnum: No IMAGE extension found in input file')
+            print('Error: No IMAGE extension found in input file')
             return -1
         cont = 1
         next = 1
         while (cont and next < nhdu):
             extension = fitsfile[next].header['XTENSION']
             if extension == 'IMAGE':
-                logging.info('get_extnum: IMAGE HDU found in extension ', next)
+                print('IMAGE HDU found in extension ', next)
                 cont = 0
             else:
                 next = next + 1
         if cont == 1:
-            logging.error('get_extnum: No IMAGE extension found in input file')
+            print('Error: No IMAGE extension found in input file')
             return -1
         return next
 
@@ -58,7 +57,7 @@ class Data(object):
 
         '''
         if imglink is None:
-            logging.error('Data.__init__: Image file not provided')
+            print('Error: Image file not provided')
             return
         fimg = fits.open(imglink)
         next = get_extnum(fimg)
@@ -76,7 +75,7 @@ class Data(object):
         elif 'CD2_2' in head:
             self.pixsize = head['CD2_2'] * 60.  # arcmin
         else:
-            logging.info('Data.__init__: No pixel size could be found in header, will assume a pixel size of 2.5 arcsec')
+            print('No pixel size could be found in header, will assume a pixel size of 2.5 arcsec')
             self.pixsize = 2.5 / 60.
         self.axes = self.img.shape
         if voronoi:
@@ -89,7 +88,7 @@ class Data(object):
             next = get_extnum(fexp)
             expo = fexp[next].data.astype(float)
             if expo.shape != self.axes:
-                logging.error('Data.__init__: Image and exposure map sizes do not match')
+                print('Error: Image and exposure map sizes do not match')
                 return
             self.exposure = expo
             fexp.close()
@@ -100,7 +99,7 @@ class Data(object):
             next = get_extnum(fbkg)
             bkg = fbkg[next].data.astype(float)
             if bkg.shape != self.axes:
-                logging.error('Data.__init__: Image and background map sizes do not match')
+                print('Error: Image and background map sizes do not match')
                 return
             self.bkg = bkg
             fbkg.close()
@@ -109,7 +108,7 @@ class Data(object):
             next = get_extnum(frms)
             rms = frms[next].data.astype(float)
             if rms.shape != self.axes:
-                logging.error('Data.__init__: Image and RMS map sizes do not match')
+                print('Error: Image and RMS map sizes do not match')
                 return
             self.rmsmap = rms
             frms.close()
@@ -130,7 +129,7 @@ class Data(object):
         nsrc = 0
         nreg = len(lreg)
         if self.exposure is None:
-            logging.error('Data.region: No exposure given')
+            print('No exposure given')
             return
         expo = np.copy(self.exposure)
         y, x = np.indices(self.axes)
@@ -141,7 +140,7 @@ class Data(object):
             elif 'image' in lreg[i]:
                 regtype = 'image'
         if regtype is None:
-            logging.error('Data.region: invalid format')
+            print('Error: invalid format')
             return
         for i in range(nreg):
             if 'circle' in lreg[i]:
@@ -223,10 +222,10 @@ class Data(object):
                 expo[ymin:ymax,xmin:xmax][src] = 0.0
                 nsrc = nsrc + 1
 
-        logging.info('Data.region: Excluded {} sources'.format(nsrc))
+        print('Excluded %d sources' % (nsrc))
         self.exposure = expo
 
-    def dmfilth(self, outfile=None):
+    def dmfilth(self,outfile=None):
         '''
         Mask the regions provided in a region file and fill in the holes by interpolating the smoothed image into the gaps and generating a Poisson realization
 
@@ -234,7 +233,7 @@ class Data(object):
         :type outfile: str , optional
         '''
         if self.img is None:
-            logging.error('Data.dmfilth: No data given')
+            print('No data given')
             return
         # Apply source mask on image
         chimg = np.where(self.exposure == 0.0)
@@ -242,14 +241,14 @@ class Data(object):
         imgc[chimg] = 0.0
 
         # High-pass filter
-        logging.info('Data.dmfilth: Applying high-pass filter')
+        print('Applying high-pass filter')
         smoothing_scale = 25
         gsb = gaussian_filter(imgc, smoothing_scale)
         gsexp = gaussian_filter(self.exposure, smoothing_scale)
         img_smoothed = np.nan_to_num(np.divide(gsb, gsexp)) * self.exposure
 
         # Interpolate
-        logging.info('Data.dmfilth: Interpolating in the masked regions')
+        print('Interpolating in the masked regions')
         y, x = np.indices(self.axes)
         nonz = np.where(img_smoothed > 0.)
         p_ok = np.array([x[nonz], y[nonz]]).T
@@ -257,7 +256,7 @@ class Data(object):
         int_vals = np.nan_to_num(griddata(p_ok, vals, (x, y), method='cubic'))
 
         # Fill holes
-        logging.info('Data.dmfilth: Filling holes')
+        print('Filling holes')
         area_to_fill = np.where(np.logical_and(int_vals > 0., self.exposure == 0))
         dmfilth = np.copy(self.img)
         dmfilth[area_to_fill] = np.random.poisson(int_vals[area_to_fill])
@@ -268,4 +267,4 @@ class Data(object):
             hdu = fits.PrimaryHDU(dmfilth)
             hdu.header = self.header
             hdu.writeto(outfile, overwrite=True)
-            logging.info('Data.dmfilth: Dmfilth image written to file '+outfile)
+            print('Dmfilth image written to file '+outfile)

@@ -227,7 +227,7 @@ class HMCModel(object):
     :param vals: Array containing initial values for the parameters (optional)
     :type vals: :class:`numpy.ndarray`
     """
-    def __init__(self,model, start=None, sd=None, limits=None, fix=None):
+    def __init__(self, model, start=None, sd=None, limits=None, fix=None):
         """
         Constructor of class HMCModel
         """
@@ -307,8 +307,6 @@ class HMCModel(object):
         else:
 
             self.fix = np.zeros(self.npar, dtype=bool)
-
-
 
     def SetPriors(self, start=None, sd=None, limits=None, fix=None):
         """

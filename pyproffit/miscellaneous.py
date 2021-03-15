@@ -253,14 +253,4 @@ def clean_bkg(img,bkg):
     img[y[remove],x[remove]]=0
     return img
 
-import timeit
-
-def timer(function):
-    def new_function(*args, **kw):
-        start_time = timeit.default_timer()
-        result = function(*args, **kw)
-        elapsed = timeit.default_timer() - start_time
-        print('Function "{name}" took {time} seconds to complete.'.format(name=function.__name__, time=elapsed))
-        return result
-    return new_function
 

@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.optimize import brentq
 from .emissivity import *
-import pickle
-from os.path import join
 from astropy.cosmology import Planck15 as cosmo
 
 def plot_multi_profiles(profs, labels=None, outfile=None, axes=None, figsize=(13, 10), fontsize=40, xscale='log', yscale='log', fmt='o', markersize=7):
@@ -347,11 +345,7 @@ class Profile(object):
                 self.nbin = nbin
             else:
                 nbin = int(self.maxrad / self.binsize * 60. + 0.5)
-
-                low = self.binsize / 60. / 2.
-                up = (nbin + 0.5) * self.binsize / 60.
-
-                self.bins = np.arange(low, up, (up-low)/nbin)
+                self.bins = np.arange(self.binsize / 60. / 2., (nbin + 0.5) * self.binsize / 60., self.binsize / 60.)
                 self.ebins = np.ones(nbin) * self.binsize / 60. / 2.
                 self.nbin = nbin
         else:
@@ -466,8 +460,6 @@ class Profile(object):
             self.counts = counts
             self.bkgprof = bkgprof
             self.bkgcounts = bkgcounts
-
-        assert self.bins.shape == self.profile.shape
 
 
     def MedianSB(self):
@@ -709,7 +701,7 @@ class Profile(object):
         xtil = np.cos(ellang) * (x - self.cx) * pixsize + np.sin(ellang) * (y - self.cy) * pixsize
         ytil = -np.sin(ellang) * (x - self.cx) * pixsize + np.cos(ellang) * (y - self.cy) * pixsize
         rads = ellipse_ratio * np.hypot(xtil, ytil / ellipse_ratio)
-        outmod = lambda x : model(x, *model.params)
+        outmod = lambda x: model.model(x, *model.params)
         if vignetting:
             modimg = outmod(rads) * pixsize ** 2 * self.data.exposure
         else:
@@ -911,30 +903,3 @@ class Profile(object):
                                         lum_ehigh=lum_ehigh)
 
         return self.ccf
-
-    def SaveProf(self, name=None, path=None, **kwargs):
-
-        data = self.data
-
-        if name is None:
-            name = ''
-
-        if path is None:
-            path = ''
-
-        self.data = None
-
-        with open(join(path,"{}.prof".format(name)), "wb") as file:
-            pickle.dump(self, file)
-
-        self.data = data
-
-    @classmethod
-    def loadProf(cls, data, filepath):
-
-        with open(filepath, "rb") as file:
-            prof = pickle.load(file)
-
-        prof.data = data
-
-        return prof

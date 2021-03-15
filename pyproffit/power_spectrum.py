@@ -5,8 +5,6 @@ from astropy.cosmology import Planck15 as cosmo
 from scipy.signal import convolve
 from scipy.special import gamma
 import matplotlib.pyplot as plt
-from numba import jit
-import logging
 import time
 
 epsilon = 1e-3
@@ -168,7 +166,7 @@ def calc_projection_factor(nn, mask, betaparams, scale):
 
     # ******* ARRAY DECLARATION **********
     tinit = time.time()
-    logging.info('calc_projection_factor: Initializing 3D k-space ... ')
+    print('Initializing 3D k-space ... ')
 
     kxq, kyq, kzq = np.indices((nn, nn, nn))
     lfr = np.where(kxq > nn / 2.)
@@ -181,7 +179,7 @@ def calc_projection_factor(nn, mask, betaparams, scale):
 
     # ******* PERTURBATIONS in k-space **********
 
-    logging.info('calc_projection_factor: Initializing fluctuations in the k-space ... ')
+    print('Initializing fluctuations in the k-space ... ')
 
     cube = nn * nn * nn
 
@@ -200,11 +198,11 @@ def calc_projection_factor(nn, mask, betaparams, scale):
     # PHASE     phi_k = arg(X_k) = atan2(Im(X_k),Re(X_k))
     # FREQUENCY of each sinusoidal == k/N (cycles per sample)
 
-    logging.info('calc_projection_factor: Computing inverse 3D FFT  ... ')
+    print('Computing inverse 3D FFT  ... ')
 
     bx = np.fft.ifftn(akx)  # note: 3D FFT --> k along (nn,nn,nn) ;PARALLEL
-    logging.info('calc_projection_factor: MINIMUM amp delta_k is {}'.format(np.min(np.absolute(akx))))
-    logging.info('calc_projection_factor: MAXIMUM amp delta_k is {}'.format(np.max(np.absolute(akx))))
+   # print('MINIMUM amp delta_k is: ', np.min(np.absolute(akx)))
+   # print('MAXIMUM amp delta_k is: ', np.max(np.absolute(akx)))
 
     # find normalization (rms, mean 0.)
     # note: bx is COMPLEX => take real part
@@ -212,17 +210,17 @@ def calc_projection_factor(nn, mask, betaparams, scale):
     # normalize fluctuations such that sigma=1
     fluct = np.real(bx) / avbx
 
-    logging.info('calc_projection_factor: RMS (= 1 sigma) delta_x is {}'.format(avbx))
-    logging.info('calc_projection_factor: Minimum (real) delta_x/rms is {}'.format(np.min(fluct)))
-    logging.info('calc_projection_factor: Maximum (real) delta_x/rms is {}'.format(np.max(fluct)))
+    print('RMS (= 1 sigma) delta_x is: ', avbx)
+    print('Minimum (real) delta_x/rms is: ', np.min(fluct))
+    print('Maximum (real) delta_x/rms is: ', np.max(fluct))
 
     hdu = fits.PrimaryHDU(fluct)
     hdulist = fits.HDUList([hdu])
     hdulist.writeto('fluctuations.fits', overwrite=True)
-    logging.info('calc_projection_factor: 3D fluctuations field saved to fluctuations.fits')
+    print('3D fluctuations field saved to fluctuations.fits')
 
     # Read data
-    logging.info('calc_projection_factor: Now computing 2D and 3D power spectra...')
+    print('Now computing 2D and 3D power spectra...')
 
     # ******* PROJECT AND CONVOLVE WITH BETA MODEL **********
 
@@ -252,10 +250,10 @@ def calc_projection_factor(nn, mask, betaparams, scale):
     imgs = []
     flucts = []
     # Convolve the image with the given scales
-    logging.info('calc_projection_factor: Convolving images with Mexican Hat filters')
+    print('Convolving images with Mexican Hat filters')
     for i in range(nsc):
         sc = scale[i]
-        logging.info('calc_projection_factor: Convolving with scale {}'.format(sc))
+        print('Convolving with scale ', sc)
         gf = np.zeros((nn,nn))
         center = int(nn / 2)
         gf[center, center] = 1.
@@ -281,7 +279,7 @@ def calc_projection_factor(nn, mask, betaparams, scale):
         flucts.append(ffluct)
 
     # Compute power spectrum in nreg independent subregions
-    logging.info('calc_projection_factor: Computing 2D and 3D power spectra...')
+    print('Computing 2D and 3D power spectra...')
     # size=np.double(nlin)/2./np.pi
     kr = 1. / np.sqrt(2. * np.pi ** 2) * np.divide(1., scale)
     Yofn = np.pi
@@ -289,12 +287,8 @@ def calc_projection_factor(nn, mask, betaparams, scale):
     # Applying mask to 2D images to correct for missing area due to gaps and point sources
     nonzero = np.where(mask>0.0)
     ps, ps3d, amp = np.empty(nsc), np.empty(nsc), np.empty(nsc)
-
     for i in range(nsc):
-
         tkr = kr[i]
-        print(np.shape(nonzero))
-        print(np.shape(img[i]))
         timg = imgs[i][nonzero]
         var = np.var(timg)  # Eq. 17 of Churazov et al. 2012
         tp = var / epsilon ** 2 / Yofn / tkr ** 2  # no noise
@@ -308,9 +302,9 @@ def calc_projection_factor(nn, mask, betaparams, scale):
     # Save data into file
     pout = np.transpose([kr, ps, amp, ps3d])[::-1]
     np.savetxt('conv2d3d.txt', pout)
-    logging.info('calc_projection_factor: Results written in file conv2d3d.txt')
+    print('Results written in file conv2d3d.txt')
     tend = time.time()
-    logging.info('calc_projection_factor: Total computing time is {} minutes'.format((tend - tinit) / 60.))
+    print(' Total computing time is: ', (tend - tinit) / 60., ' minutes')
     return pout
 
 
@@ -378,7 +372,7 @@ class PowerSpectrum(object):
         self.size = img.shape
         self.mask = mask
         fmod[0].data = mask
-        fmod.writeto('tmp/mask.fits', overwrite=True)
+        fmod.writeto('mask.fits', overwrite=True)
         # Simulate perfect model with Poisson noise
         randmod = np.random.poisson(modimg[miny:maxy, minx:maxx])
         simmod = np.nan_to_num(np.divide(randmod, modimg[miny:maxy, minx:maxx]))
@@ -390,13 +384,13 @@ class PowerSpectrum(object):
         # Convolve images
         for i in range(len(scale)):
             sc = scale[i]
-            logging.info('MexicanHat: Convolving with scale {}'.format(sc))
+            print('Convolving with scale', sc)
             convimg, convmod = calc_mexicanhat(sc, img, mask, simmod)
             # Save image
             fmod[0].data = convimg
-            fmod.writeto('tmp/conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
+            fmod.writeto('conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
             fmod[0].data = convmod
-            fmod.writeto('tmp/conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
+            fmod.writeto('conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))), overwrite=True)
         fmod.close()
 
     #
@@ -427,7 +421,7 @@ class PowerSpectrum(object):
         ######################
         # Define the region where the power spectrum will be extracted
         ######################
-        fmask = fits.open('tmp/mask.fits')
+        fmask = fits.open('mask.fits')
         mask = fmask[0].data
         data_size = mask.shape
         fmask.close()
@@ -444,22 +438,22 @@ class PowerSpectrum(object):
         nreg = 20  # Number of subregions for bootstrap calculation
         for i in range(nsc):
             # Read images
-            fco = fits.open('tmp/conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))))
+            fco = fits.open('conv_scale_%d_kpc.fits' % (int(np.round(sckpc[i]))))
             convimg = fco[0].data.astype(float)
             fco.close()
-            fmod = fits.open('tmp/conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))))
+            fmod = fits.open('conv_model_%d_kpc.fits' % (int(np.round(sckpc[i]))))
             convmod = fmod[0].data.astype(float)
             fmod.close()
-            logging.info('PS: Computing the power at scale {} kpc'.format(sckpc[i]))
+            print('Computing the power at scale', sckpc[i], 'kpc')
             ps[i], psnoise[i], vps = calc_ps(region, convimg, convmod, kr[i], nreg)
             vals.append(vps)
         # Bootstrap the data and compute covariance matrix
-        logging.info('PS: Computing the covariance matrix...')
+        print('Computing the covariance matrix...')
         nboot = int(1e4)  # number of bootstrap resamplings
         cov = do_bootstrap(vals, nboot)
         # compute eigenvalues of covariance matrix to verify that the matrix is positive definite
         la, v = np.linalg.eig(cov)
-        logging.info('PS: Eigenvalues: {}'.format(la))
+        print('Eigenvalues: ', la)
         eps = np.empty(nsc)
         for i in range(nsc):
             eps[i] = np.sqrt(cov[i, i])
@@ -490,7 +484,7 @@ class PowerSpectrum(object):
         :type cfact: class:`numpy.ndarray` , optional
         """
         if self.ps is None:
-            logging.error('Plot: No power spectrum exists in structure')
+            print('Error: No power spectrum exists in structure')
             return
         plt.clf()
         fig = plt.figure(figsize=(13, 10))
@@ -510,9 +504,13 @@ class PowerSpectrum(object):
         plt.plot(self.k, self.psnoise, color='blue', label='Poisson noise')
         plt.fill_between(self.k, self.ps - self.eps, self.ps + self.eps, color='red', alpha=0.4)
         if plot_3d:
-
-            plt.plot(self.k, self.ps3d, color='green', linewidth=2, label='P$_{3D}$')
-            plt.fill_between(self.k, self.ps3d - self.eps3d, self.ps3d + self.eps3d, color='green', alpha=0.4)
+            kcf = cfact[:,0]
+            cf = cfact[:,3]/cfact[:,1]
+            interp_cf = np.interp(self.kpix,kcf,cf)
+            ps3d = self.ps * interp_cf
+            eps3d = self.eps * interp_cf
+            plt.plot(self.k, ps3d, color='green', linewidth=2, label='P$_{3D}$')
+            plt.fill_between(self.k, ps3d - eps3d, ps3d + eps3d, color='green', alpha=0.4)
         plt.legend(fontsize=22)
         if save_plots:
             plt.savefig(outps)
@@ -536,9 +534,10 @@ class PowerSpectrum(object):
         plt.plot(self.k, self.amp, color='red', linewidth=2,label='A$_{2D}$')
         plt.fill_between(self.k, self.amp - self.eamp, self.amp + self.eamp, color='red', alpha=0.4)
         if plot_3d:
-
+            a3d=np.sqrt(ps3d*4.*np.pi*self.kpix**3)/2.
+            ea3d=1./2.*np.power(ps3d*4.*np.pi*self.kpix**3,-0.5)*4.*np.pi*self.kpix**3*eps3d/2.
             plt.plot(self.k, a3d, color='green', linewidth=2,label='A$_{3D}$')
-            plt.fill_between(self.k, self.a3d - self.ea3d, self.a3d + self.ea3d, color='green', alpha=0.4)
+            plt.fill_between(self.k, a3d - ea3d, a3d + ea3d, color='green', alpha=0.4)
         plt.legend(fontsize=22)
         if save_plots:
             plt.savefig(outamp)
@@ -555,7 +554,7 @@ class PowerSpectrum(object):
         :type outcov: str
         """
         if self.ps is None:
-            logging.error('Save: Nothing to save')
+            print('Error: Nothing to save')
             return
         np.savetxt(outfile, np.transpose([self.k, self.ps, self.eps, self.psnoise, self.amp, self.eamp])[::-1],
                    header='k/kpc-1  PS2D  dPS2D  Noise  A2D  dA2D')
@@ -579,18 +578,18 @@ class PowerSpectrum(object):
         pixsize = self.data.pixsize
         npar = len(betaparams)
         if npar == 4:
-            logging.info('ProjectionFactor: We will use a single beta profile')
+            print('We will use a single beta profile')
             betaparams[1] = betaparams[1] / pixsize
             betaparams[2] = 0.
         elif npar == 6:
-            logging.info('ProjectionFactor: We will use a double beta profile')
+            print('We will use a double beta profile')
             betaparams[1] = betaparams[1] / pixsize
             betaparams[2] = betaparams[2] / pixsize
             betaparams[4] = 0.
         else:
-            logging.error('ProjectionFactor: Invalid number of SB parameters')
+            print('Invalid number of SB parameters')
             return
-        fmask = fits.open('tmp/mask.fits')
+        fmask = fits.open('mask.fits')
         mask = fmask[0].data
         data_size = mask.shape
         fmask.close()
@@ -598,7 +597,7 @@ class PowerSpectrum(object):
         Mpcpix = 1000. / kpcp / self.data.pixsize  # 1 Mpc in pixel
         regsizepix = region_size * Mpcpix
         if regsizepix>data_size[0]/2:
-            logging.error('ProjectionFactor: region size larger than image size')
+            print('Error: region size larger than image size')
             return
         minx = int(np.round(data_size[1]/2 - regsizepix))
         maxx = int(np.round(data_size[1]/2 + regsizepix))
@@ -610,13 +609,4 @@ class PowerSpectrum(object):
         maxscale = regsizepix / 2. # at least 4 resolution elements on a side
         scale = np.logspace(np.log10(minscale), np.log10(maxscale), 10)  # 10 scale logarithmically spaced
         self.cfact = calc_projection_factor(npix, msk, betaparams, scale)
-
-        kcf = self.cfact[:, 0]
-        cf = self.cfact[:, 3] / self.cfact[:, 1]
-        interp_cf = np.interp(self.kpix, kcf, cf)
-        self.ps3d = self.ps * interp_cf
-        self.eps3d = self.eps * interp_cf
-        self.a3d = np.sqrt(self.ps3d * 4. * np.pi * self.kpix ** 3) / 2.
-        self.ea3d = 1. / 2. * np.power(self.ps3d * 4. * np.pi * self.kpix ** 3, -0.5) * 4. * np.pi * self.kpix ** 3 * self.eps3d / 2.
-
-        return self.cfact
+        return  self.cfact

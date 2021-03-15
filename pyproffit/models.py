@@ -1,13 +1,4 @@
 import numpy as np
-import pymc3 as pm
-
-parameter_bounds = {}
-
-parameter_bounds['BetaModel'] = (np.array([-5, 0, -10, -10]),
-                                 np.array([5, np.inf, 10, 10]))
-
-parameter_bounds['Vikhlinin'] = (np.array([0, 0, -5, 0, 0, 0, -10, -10]),
-                                 np.array([5, 15, 5, 100, 5, 5, 10, 10]))
 
 def BetaModel(x, beta, rc, norm, bkg):
     """
@@ -232,31 +223,17 @@ class Model(object):
     :param vals: Array containing initial values for the parameters (optional)
     :type vals: :class:`numpy.ndarray`
     """
-    def __init__(self, model, vals=None, freeze=None):
+    def __init__(self,model,vals=None):
         """
         Constructor of class Model
         """
         self.model=model
-        self.low_bounds, self.high_bounds = parameter_bounds[model.__name__]
+
         npar = model.__code__.co_argcount
+
         self.npar = npar - 1
-        self.parnames = list(model.__code__.co_varnames[1:npar])
-        self.freeze = freeze
-        self.fr_params = []
 
-        if freeze is not None:
-
-            self.npar -= len(freeze)
-
-            for key, value in freeze.items():
-                index = self.parnames.index(key)
-                self.low_bounds = np.delete(self.low_bounds, index)
-                self.high_bounds = np.delete(self.high_bounds, index)
-                self.fr_params.append((index, value))
-
-            for key in freeze.keys():
-
-                self.parnames.remove(key)
+        self.parnames = model.__code__.co_varnames[1:npar]
 
         if vals is not None:
 
@@ -271,18 +248,14 @@ class Model(object):
                 self.params = vals
         else:
 
-            self.params = None
+            self.params=None
 
     def __call__(self, x, *pars):
 
-        pars = list(pars)
-        for elem in self.fr_params:
-
-            pars.insert(*elem)
-
         return self.model(x, *pars)
 
-    def SetParameters(self, vals):
+
+    def SetParameters(self,vals):
         """
         Set input values for the model parameters
 
