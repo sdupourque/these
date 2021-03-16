@@ -1,4 +1,7 @@
-from astropy.cosmology import Planck15 as cosmo
+from astropy.cosmology import FlatLambdaCDM
+
+cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+
 import numpy as np
 import pymc3 as pm
 import time

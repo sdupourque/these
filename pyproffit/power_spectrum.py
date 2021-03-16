@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
 from astropy.io import fits
-from astropy.cosmology import Planck15 as cosmo
 from scipy.signal import convolve
 from scipy.special import gamma
 import matplotlib.pyplot as plt
 import time
+from astropy.cosmology import FlatLambdaCDM
+
+cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
 
 epsilon = 1e-3
 Yofn = np.pi

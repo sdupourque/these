@@ -22,7 +22,6 @@ def DoubleBetaPM(x, beta, rc1, rc2, ratio, norm, bkg):
     out = n2 * (comp1 + ratio * comp2) + c2
     return out
 
-
 def PowerLawPM(x, alpha, norm, pivot, bkg):
     """
     """
@@ -201,11 +200,11 @@ def fit_profile_pymc3(hmcmod, prof, nmcmc=1000, tune=500, find_map=True, fitlow=
 
             start = pm.find_MAP()
 
-            trace = pm.sample(nmcmc, start=start, tune=tune)
+            trace = pm.sample(nmcmc, start=start, tune=tune, return_inferencedata=False)
 
         else:
 
-            trace = pm.sample(nmcmc, tune=tune)
+            trace = pm.sample(nmcmc, tune=tune, return_inferencedata=False)
 
     print('Done.')
 
@@ -232,12 +231,8 @@ class HMCModel(object):
         Constructor of class HMCModel
         """
         self.model = model
-
-        npar = model.__code__.co_argcount - 1
-
-        self.npar = npar
-
-        self.parnames = model.__code__.co_varnames[1:npar + 1]
+        self.npar = model.npar
+        self.parnames = model.parnames
 
         if start is not None:
 

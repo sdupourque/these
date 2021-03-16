@@ -197,6 +197,7 @@ class Fitter:
             See the iminuit documentation: https://iminuit.readthedocs.io/en/stable/index.html
         """
         prof=self.profile
+
         if prof.profile is None:
             print('Error: No valid profile exists in provided object')
             return
@@ -209,7 +210,8 @@ class Fitter:
              # Define the fitting algorithm
             chi2=ChiSquared(model,prof.bins,prof.ebins,prof.profile,prof.eprof,psfmat=psfmat,fitlow=fitlow,fithigh=fithigh)
             # Construct iminuit object
-            minuit=iminuit.Minuit(chi2,**kwargs)
+            self.cost = chi2
+            minuit=iminuit.Minuit(chi2, name=model.parnames, **kwargs)
         elif method=='cstat':
             if prof.counts is None:
                 print('Error: No count profile exists')
@@ -217,7 +219,8 @@ class Fitter:
             # Define the fitting algorithm
             cstat=Cstat(model,prof.bins,prof.ebins,prof.counts,prof.area,prof.effexp,prof.bkgcounts,psfmat=psfmat,fitlow=fitlow,fithigh=fithigh)
             # Construct iminuit object
-            minuit=iminuit.Minuit(cstat,**kwargs)
+            self.cost = cstat
+            minuit=iminuit.Minuit(cstat, name=model.parnames, **kwargs)
         else:
             print('Unknown method ',method)
             return
