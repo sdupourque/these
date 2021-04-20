@@ -1,9 +1,16 @@
 import pyproffit
 import numpy as np
+from scipy.special import gamma
 from abel.hansenlaw import hansenlaw_transform
 
 def BetaModel3D(x, beta, rc, norm, bkg):
-    return np.power(10., norm) * np.power(1. + (x / rc) ** 2, -3. * beta / 2.)
+    """see Clerc & al 2019 Appendix B"""
+    return (10.**norm) * np.power(1 + (x / rc) ** 2, -3*beta)
+
+def BetaModel2D(x, beta, rc, norm, bkg):
+    """see Clerc & al 2019 Appendix B"""
+    µc = np.sqrt(np.pi)*gamma(3*beta - 1/2)/gamma(3*beta)
+    return (10.**norm) * rc * µc * np.power(1 + (x / rc) ** 2, -3*beta + 1/2) + (10.**bkg)
 
 class ProjectedModel(pyproffit.Model):
 
@@ -20,17 +27,33 @@ class ProjectedModel(pyproffit.Model):
 
         return np.interp(x, self._xp, fp)
 
+class BetaModel(pyproffit.Model):
+
+    def __init__(self):
+
+        self.npar = 4
+        self.parnames = ['beta', 'rc', 'norm', 'bkg']
+        self.params = None
+        self.model3D = BetaModel3D
+
+    def __call__(self, x, *pars):
+
+        return BetaModel2D(x, *pars)
+
 if __name__=='__main__':
 
     import matplotlib.pyplot as plt
 
-    mod = ProjectedModel(BetaModel3D, maxrad=15.)
-    mod.SetParameters([2/3, 3, -2.5, -5])
+    mod1 = ProjectedModel(BetaModel3D, maxrad=15.)
+    mod2 = BetaModel()
+    mod1.SetParameters([2/3, 3, -2.5, -5])
+    mod2.SetParameters([2 / 3, 3, -2.5, -5])
 
     r = np.linspace(0, 15, 1000)
 
-    plt.plot(r, mod.model(r, *mod.params))
-    plt.plot(r, mod(r, *mod.params))
+    plt.plot(r, np.abs(mod1.model(r, *mod1.params)-mod2.model3D(r, *mod2.params)))
+    plt.plot(r, np.abs(mod1(r, *mod1.params)-mod2(r, *mod2.params)))
+
 
     plt.loglog()
     plt.show()
