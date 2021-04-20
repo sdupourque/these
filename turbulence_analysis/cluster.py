@@ -6,7 +6,7 @@ from tqdm import tqdm
 from astropy.io import fits
 from astropy.wcs import WCS
 from scipy.special import gamma
-from .project_model import ProjectedModel, BetaModel3D
+from .project_model import BetaModel
 from .project_ps import EtaBetaModel, P3D_to_P2D, FitterPS,ChiSquared_P3D
 from astropy.cosmology import FlatLambdaCDM
 
@@ -47,7 +47,7 @@ class Cluster:
         norm = np.log10(self.prof.profile.max()/(rc)/(np.sqrt(np.pi)*gamma(3*beta-1/2)/gamma(3*beta)))
         bkg = np.log10(self.prof.profile.min())
 
-        self.mod = ProjectedModel(BetaModel3D, maxrad=self.prof.maxrad)
+        self.mod = BetaModel()
         self.fitobj = pyproffit.Fitter(model=self.mod, profile=self.prof)
         self.fitobj.Migrad(beta=beta,
                            rc=rc,
@@ -57,12 +57,6 @@ class Cluster:
         self.model_best_fit = self.mod.params.copy()
         self.outmod()
         self.model_best_fit_image = fits.getdata('outmod_{}.fits'.format(self.name), memmap = False)
-
-    def hmc(self):
-
-        self.hmcmod = pyproffit.HMCModel(self.mod, start=self.mod.params * 1.5, sd=[0.3, 3., 3., 3.],
-                                    limits=np.array([[0., 2.], [0., 10.], [-10., 10.], [-10., 10.]]))
-        pyproffit.fit_profile_pymc3(hmcmod=self.hmcmod, prof=self.prof, tune=1000)
 
     def model_mcmc(self, n_samples=1000):
 
@@ -98,21 +92,27 @@ class Cluster:
 
         r_size = self.r500/1000
         self.outmod(params=self.model_best_fit)
-        self.psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof)
+        self.psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=10)
         self.psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
                        z=self.z,
                        region_size=r_size,
                        factshift=1.5,
                        path= self.path,
-                       poisson = False)
+                       poisson = True)
 
         self.psc.PS(z=self.z, region_size=r_size, path=self.path)
-        self.psc.ps = np.abs(self.psc.ps)
+
+        if self.psc.ps.any() <0:
+            print("Des valeurs négatives WTF")
+
+        self.ps = np.copy(np.abs(self.psc.ps))
+        self.psnoise = np.abs(self.psc.psnoise)
 
     def ps_mcmc(self, n_samples=100):
 
         self.ps_samples_poisson = []
         self.ps_samples_profile = []
+        self.ps_noise_samples = []
 
         r_size = self.r500 / 1000
 
@@ -120,7 +120,7 @@ class Cluster:
 
             self.outmod(params=self.model_samples[i,:])
 
-            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof)
+            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=10)
             psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
                            z=self.z,
                            region_size=r_size,
@@ -136,7 +136,7 @@ class Cluster:
 
         for i in tqdm(range(n_samples)):
 
-            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof)
+            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=10)
             psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
                            z=self.z,
                            region_size=r_size,
@@ -147,6 +147,7 @@ class Cluster:
             psc.PS(z=self.z, region_size=r_size, path=self.path)
 
             self.ps_samples_poisson.append(np.abs(np.copy(psc.ps)))
+            self.ps_noise_samples.append(np.abs(np.copy(psc.psnoise)))
 
         self.ps_cov_poisson = np.cov(self.ps_samples_poisson, rowvar=False)
         self.ps_cov_profile = np.cov(self.ps_samples_profile, rowvar=False)
