@@ -7,7 +7,7 @@ from astropy.table import Table
 
 #id = 22
 id = 18
-#id = 15
+
 catalog = Table.read('./data/master_table.fits')
 cluster = Cluster(catalog[id])
 
