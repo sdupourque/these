@@ -17,7 +17,6 @@ catalog_XCOP.rename_column('R500_HSE', 'R500')
 catalog_XCOP['THETA500'] = catalog_XCOP['R500']/cosmo.kpc_proper_per_arcmin(catalog_XCOP['REDSHIFT']).value
 catalog_XCOP['THETA500'].unit = 'arcmin'
 
-
 catalog_XCOP['TAG'] = 'XCOP'
 catalog_XCOP['SZ'] = 'None'
 

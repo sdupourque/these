@@ -24,12 +24,16 @@ class Cluster:
         self.bkglink = os.path.join(id['PATH'],id['bkglink'])
         self.reg = os.path.join(id['PATH'],id['reg'])
         self.r500 = id['R500']
+        self.t500 = id['THETA500']
         self.z = id['REDSHIFT']
         self.r500_arcmin = self.r500/cosmo.kpc_proper_per_arcmin(self.z).value
+        self.ra = id['RA']
+        self.dec = id['DEC']
 
         self.dat = pyproffit.Data(self.datalink, explink=self.explink, bkglink=self.bkglink)
-        self.wcs = WCS(header=fits.getheader(self.datalink))
+        self.wcs = self.dat.wcs_inp
         self.dat.region(self.reg)
+        self.nscales = 10
 
         self.prof = None
         self.mod = None
@@ -37,7 +41,7 @@ class Cluster:
 
     def extract_profile(self):
 
-        self.prof = pyproffit.Profile(self.dat, center_choice='centroid', maxrad=15., binsize=10., cosmo=cosmo)
+        self.prof = pyproffit.Profile(self.dat, center_choice='centroid', centroid_region=self.t500/2, center_ra=self.ra, center_dec=self.dec, maxrad=self.t500, binsize=10., cosmo=cosmo)
         self.prof.SBprofile(ellipse_ratio=self.prof.ellratio, rotation_angle=self.prof.ellangle % 180)
 
     def fit_model(self):
@@ -53,7 +57,8 @@ class Cluster:
                            rc=rc,
                            norm=norm,
                            bkg=bkg,
-                           limit_rc=(0, 10), limit_bkg=(-20,0))
+                           limit_rc=(0, 10),
+                           limit_bkg=(-20,0))
         self.model_best_fit = self.mod.params.copy()
         self.outmod()
         self.model_best_fit_image = fits.getdata('outmod_{}.fits'.format(self.name), memmap = False)
@@ -90,20 +95,17 @@ class Cluster:
 
     def ps2D(self):
 
-        r_size = self.r500/1000
+        self.r_size = 2*self.r500 / 1000
         self.outmod(params=self.model_best_fit)
-        self.psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=10)
+        self.psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=self.nscales, cosmo=cosmo)
         self.psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
                        z=self.z,
-                       region_size=r_size,
+                       region_size=self.r_size,
                        factshift=1.5,
                        path= self.path,
                        poisson = True)
 
-        self.psc.PS(z=self.z, region_size=r_size, path=self.path)
-
-        if self.psc.ps.any() <0:
-            print("Des valeurs négatives WTF")
+        self.psc.PS(z=self.z, region_size=self.r_size, radius_out=self.r500 / 1000, path=self.path)
 
         self.ps = np.copy(np.abs(self.psc.ps))
         self.psnoise = np.abs(self.psc.psnoise)
@@ -114,21 +116,19 @@ class Cluster:
         self.ps_samples_profile = []
         self.ps_noise_samples = []
 
-        r_size = self.r500 / 1000
-
         for i in tqdm(range(n_samples)):
 
             self.outmod(params=self.model_samples[i,:])
 
-            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=10)
+            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=self.nscales, cosmo=cosmo)
             psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
                            z=self.z,
-                           region_size=r_size,
+                           region_size=self.r_size,
                            factshift=1.5,
                            path=self.path,
                            poisson=False)
 
-            psc.PS(z=self.z, region_size=r_size, path=self.path)
+            psc.PS(z=self.z, region_size=self.r_size, radius_out=self.r500 / 1000, path=self.path)
 
             self.ps_samples_profile.append(np.abs(np.copy(psc.ps)))
 
@@ -136,15 +136,15 @@ class Cluster:
 
         for i in tqdm(range(n_samples)):
 
-            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=10)
+            psc = pyproffit.power_spectrum.PowerSpectrum(self.dat, self.prof, nscales=self.nscales, cosmo=cosmo)
             psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
                            z=self.z,
-                           region_size=r_size,
+                           region_size=self.r_size,
                            factshift=1.5,
                            path=self.path,
                            poisson=True)
 
-            psc.PS(z=self.z, region_size=r_size, path=self.path)
+            psc.PS(z=self.z, region_size=self.r_size, radius_out=self.r500 / 1000, path=self.path)
 
             self.ps_samples_poisson.append(np.abs(np.copy(psc.ps)))
             self.ps_noise_samples.append(np.abs(np.copy(psc.psnoise)))

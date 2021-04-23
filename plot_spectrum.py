@@ -91,6 +91,7 @@ for cluster in catalog:
 plt.loglog()
 plt.xlabel('$k$ [kpc$^{-1}$]')
 plt.ylabel('$P_{2D}$ [kpc$^{4}$]')
+
 custom_lines = [Line2D([0], [0], color='blue', lw=4),
                 Line2D([0], [0], color='red', lw=4),
                 Line2D([0], [0], color='green', lw=4)]
@@ -162,23 +163,23 @@ for cluster in catalog:
         k, ps2d = np.loadtxt('power_spectrum/ps2d_{}.txt'.format(cluster['NAME']))
         ps2d = np.abs(ps2d)
         cov = np.loadtxt('power_spectrum/pscov_{}.txt'.format(cluster['NAME']))
-        plt.plot(k*cluster['R500'], ps2d/np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])), color='black', alpha=0.1)
+        plt.plot(k*cluster['R500'], ps2d, color='black', alpha=0.1)
 
 
         if cluster['TAG'] == 'XCOP':
             plt.fill_between(k * cluster['R500'],
-                                 (ps2d-np.diag(cov)**0.5) / np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])),
-                                 (ps2d+np.diag(cov)**0.5) / np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])),
+                                 (ps2d-np.diag(cov)**0.5),
+                                 (ps2d+np.diag(cov)**0.5),
                                  alpha=0.05, color='blue')
         if cluster['TAG'] == 'CHEXMATE':
             plt.fill_between(k * cluster['R500'],
-                                 (ps2d-np.diag(cov)**0.5) / np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])),
-                                 (ps2d+np.diag(cov)**0.5) / np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])),
+                                 (ps2d-np.diag(cov)**0.5),
+                                 (ps2d+np.diag(cov)**0.5),
                                  alpha=0.05, color='red')
         if cluster['TAG'] == 'LPSZ':
             plt.fill_between(k * cluster['R500'],
-                                 (ps2d-np.diag(cov)**0.5) / np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])),
-                                 (ps2d+np.diag(cov)**0.5) / np.trapz(np.flip(ps2d), x=np.flip(k * cluster['R500'])),
+                                 (ps2d-np.diag(cov)**0.5),
+                                 (ps2d+np.diag(cov)**0.5),
                                  alpha=0.05, color='green')
 
     except:
@@ -186,7 +187,7 @@ for cluster in catalog:
 
 plt.loglog()
 plt.xlabel('$k/k_{500}$')
-plt.ylabel('$P_{2D}$/$\int P_{2D}(k)dk$')
+plt.ylabel('$P_{2D}$')
 custom_lines = [Line2D([0], [0], color='blue', lw=4),
                 Line2D([0], [0], color='red', lw=4),
                 Line2D([0], [0], color='green', lw=4)]

@@ -33,13 +33,71 @@ def images_expo(cluster):
     ra = downscale_local_mean(ra, (3, 3))
     dec = downscale_local_mean(dec, (3, 3))
 
-    fig = make_subplots(rows=1, cols=3,subplot_titles=('Data', 'Exposure', 'Background'),shared_xaxes=True,shared_yaxes=True)
-    fig.add_trace(go.Heatmap(x = ra[0,:], y = dec[:,0], z=np.log10(img), hoverongaps=False, name="img", colorbar_x=cbarlocs[0], colorbar_title='log(Count)'), row=1, col=1)
-    fig.add_trace(go.Heatmap(x = ra[0,:], y = dec[:,0], z=exp/1000, hoverongaps=False, name="exp", colorbar_x=cbarlocs[1], colorbar_title='ks'), row=1, col=2)
-    fig.add_trace(go.Heatmap(x = ra[0,:], y = dec[:,0], z=bkg, hoverongaps=False, name="bkg", colorbar_x=cbarlocs[2], colorbar_title='Count'), row=1, col=3)
+    ratio = cluster.prof.ellratio
+    angle = cluster.prof.ellangle*np.pi/180
+
+    c, s = np.cos(angle), np.sin(angle)
+    R = np.array(((c, -s), (s, c)))
+
+    t = np.linspace(0,2*np.pi,100)
+    x_ell = cluster.t500/60*np.cos(t)
+    y_ell = ratio*cluster.t500/60*np.sin(t)
+    
+    x_ell, y_ell = R@np.vstack((x_ell, y_ell))
+
+    fig = make_subplots(rows=1, cols=3,subplot_titles=('Data', 'Exposure', 'Background'),shared_xaxes='all',shared_yaxes='all')
+
+    fig.add_trace(
+        go.Heatmap(x = ra[0,:],
+                   y = dec[:,0],
+                   z=np.log10(img),
+                   hoverongaps=False,
+                   name="img",
+                   colorbar_x=cbarlocs[0],
+                   colorbar_title='log(Count)',
+                   text=['Count Map'],
+                   colorscale='Jet'), row=1, col=1)
+
+    fig.add_trace(
+        go.Heatmap(x = ra[0,:],
+                   y = dec[:,0],
+                   z=exp/1000,
+                   hoverongaps=False,
+                   name="exp",
+                   colorbar_x=cbarlocs[1],
+                   colorbar_title='ks',
+                   text=['Exposure Map'],
+                   colorscale='Jet'), row=1, col=2)
+
+    fig.add_trace(
+        go.Heatmap(x = ra[0,:],
+                   y = dec[:,0],
+                   z=bkg, hoverongaps=False,
+                   name="bkg",
+                   colorbar_x=cbarlocs[2],
+                   colorbar_title='Count',
+                   text=['Background Map'],
+                   colorscale='Jet'), row=1, col=3)
+
+    fig.add_trace(go.Scatter(
+        x=[cluster.prof.cra],
+        y=[cluster.prof.cdec],
+        name='c',
+        text=['Estimated center'],
+        marker_symbol="x",
+        marker_color="purple"
+    ), row=1, col="all")
+
+    fig.add_trace(go.Scatter(
+        x=x_ell + cluster.prof.cra,
+        y=y_ell + cluster.prof.cdec,
+        name='r500',
+        text=['R500 Ellipse']
+    ), row=1, col="all")
 
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
+    fig.update_layout(showlegend=False)
     fig.update_layout(autosize = True)
     fig.update_layout(title='Raw inputs')
     #fig.update_layout(xaxis_showgrid=False, yaxis_showgrid=False, xaxis_zeroline=False, yaxis_zeroline=False)
@@ -57,10 +115,13 @@ def profile(cluster):
     tmod = cluster.mod(rads, *cluster.mod.params)
     chi = (prof-cluster.mod(rads, *cluster.mod.params))/cluster.prof.eprof
 
-    fig = make_subplots(rows=2, cols=1,shared_xaxes=True,
+    fig = make_subplots(rows=2, cols=2,shared_xaxes=True,
                         row_width=[0.2, 0.8],
+                        specs=[[{}, {"rowspan": 2}],
+                               [{}, None]],
                         vertical_spacing=0.02
                         )
+
 
     fig.add_scatter(x=rads, y=prof, mode='markers', name='SB',
                             error_x=dict(type='data',
@@ -71,7 +132,7 @@ def profile(cluster):
                                          visible=True),
                             row=1, col=1)
 
-    fig.add_scatter(x=rads, y=tmod, name=cluster.mod.model.__name__, row=1, col=1,
+    fig.add_scatter(x=rads, y=tmod, name='BetaModel', row=1, col=1,
                     error_x=dict(type='data',
                                  array=cluster.prof.ebins,
                                  visible=True,
@@ -90,6 +151,21 @@ def profile(cluster):
                                          array=np.ones(len(rads)),
                                          visible=True)),
                             row=2, col=1)
+
+    ra, dec = cluster.wcs.array_index_to_world_values(*np.indices(cluster.model_best_fit_image.shape))
+    ra = downscale_local_mean(ra, (3, 3))
+    dec = downscale_local_mean(dec, (3, 3))
+    bestmod = downscale_local_mean(cluster.model_best_fit_image, (3, 3))
+
+    fig.add_trace(
+        go.Heatmap(x=ra[0, :],
+                   y=dec[:, 0],
+                   z=np.log10(bestmod),
+                   hoverongaps=False,
+                   name="img",
+                   colorbar_title='log(Count)',
+                   text=['Count Map'],
+                   colorscale='Jet'), row=1, col=2)
 
     fig.update_xaxes(type="log", row=1,col=1)
     fig.update_yaxes(type="log", title_text=r'$\text{Surface Brightness } [\text{cts }.\text{s}^{-1}.\text{arcmin}^2]$', automargin=True,row=1,col=1)
@@ -133,27 +209,28 @@ def power_spectrum(cluster):
     fig.add_trace(go.Scatter(x=k, y=ps2d - np.diag(cluster.ps_covariance) ** 0.5,
                              fill=None,
                              line_color='#636efa',
-                             name='$-1\sigma$',
                              mode='lines'
                              ))
 
     fig.add_trace(go.Scatter(x=k, y=ps2d+np.diag(cluster.ps_covariance)**0.5,
                              fill='tonexty',
                              line_color='#636efa',
-                             name='$+1\sigma$',
                              mode='lines'  # override default markers+lines
                              ))
 
-
-    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_profile)**0.5, name='$1\sigma$ Poisson',
+    fig.add_scatter(x=k, y=cluster.psc.psnoise, name='PSNoise',
                     mode='lines',
                     line_color='red')
 
-    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_poisson)**0.5, name='$1\sigma$ Profile',
+    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_profile)**0.5, name='Err-Profile',
+                    mode='lines',
+                    line_color='red')
+
+    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_poisson)**0.5, name='Err-Poisson',
                     mode='lines',
                     line_color='green')
 
-    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_sample) ** 0.5, name='$1\sigma$ Profile',
+    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_sample) ** 0.5, name='Err-Sample',
                     mode='lines',
                     line_color='purple')
 
@@ -163,7 +240,7 @@ def power_spectrum(cluster):
 
     fig.update_xaxes(type="log")
     fig.update_yaxes(type="log", title_text=r'$\text{Power Spectrum (2D) } [\text{cts }.\text{s}^{-1}.\text{arcmin}^2]$', automargin=True)
-    fig.update_xaxes(type="log", title_text='k [kpx$^{-1}$]', automargin=True)
+    fig.update_xaxes(type="log", title_text='$k [\text{kpc}^{-1}]$', automargin=True)
     #fig.update_xaxes(range=np.log10([0.9*rads[0], 1.1*rads[-1]]))
     fig.update_layout(hovermode='x unified')
     fig.update_layout(
