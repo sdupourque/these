@@ -6,7 +6,7 @@ from turbulence_analysis import graph
 from astropy.table import Table
 
 #id = 22
-id = 15
+id = 18
 #id = 15
 catalog = Table.read('./data/master_table.fits')
 cluster = Cluster(catalog[id])
@@ -91,9 +91,9 @@ plt.show()
 
 plt.figure(figsize=(4,4))
 plt.plot(cluster.psc.k, cluster.ps)
-#plt.fill_between(cluster.psc.k, np.abs(cluster.psc.ps)- np.diag(cluster.ps_covariance)**0.5, np.abs(cluster.psc.ps)+ np.diag(cluster.ps_covariance)**0.5, alpha=0.5)
-#plt.plot(cluster.psc.k, np.diag(np.abs(cluster.ps_cov_poisson))**0.5)
-#plt.plot(cluster.psc.k, np.diag(np.abs(cluster.ps_cov_profile))**0.5)
+plt.fill_between(cluster.psc.k, np.abs(cluster.psc.ps)- np.diag(cluster.ps_covariance)**0.5, np.abs(cluster.psc.ps)+ np.diag(cluster.ps_covariance)**0.5, alpha=0.5)
+plt.plot(cluster.psc.k, np.diag(np.abs(cluster.ps_cov_poisson))**0.5)
+plt.plot(cluster.psc.k, np.diag(np.abs(cluster.ps_cov_profile))**0.5)
 plt.xlabel(r'$k$ [kpc$^{-1}$]')
 plt.ylabel(r'$P_{2D}$ [kpc$^{4}$]')
 
