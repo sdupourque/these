@@ -49,8 +49,8 @@ class P3D_to_P2D:
 
         @njit
         def P3D(k, k_in, norm, alpha):
-            k_pivot = 1e-3
-            return 10**norm *np.exp(-(k_in / k) ** 2 ) * (k / k_pivot) ** (-alpha)
+            k_piv = 1e-3
+            return 10 ** norm * np.exp(-(k_in / k) ** 2) * (k / k_piv) ** (-alpha)
 
         @vectorize(nopython=True)
         def shifted_P3D(kr1, kr2, kz, k_in, norm, alpha):
@@ -67,8 +67,14 @@ class P3D_to_P2D:
 
         def _call(kr_in, k_in, norm, alpha):
 
-            return 4*simps(simps(self.shifted_P3D(kr_in, self.kkr, self.kkz, k_in, norm, alpha) * self.Peta, x=self.kz, axis=-1)
-                         , x=self.kr,axis=-1)
+            return 4*simps(simps(self.shifted_P3D(kr_in,
+                                                  self.kkr,
+                                                  self.kkz,
+                                                  k_in,
+                                                  norm,
+                                                  alpha) * self.Peta,
+                                 x=self.kz, axis=-1),
+                           x=self.kr, axis=-1)
 
         self._vcall = np.vectorize(_call)
 
