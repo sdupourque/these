@@ -1,20 +1,20 @@
 import os
 import sys
 import numpy as np
-from turbulence_analysis.graph import dashboard
-from turbulence_analysis.cluster import Cluster
+from turb.graph import dashboard
+from turb.extract_ps import Extractor
 from astropy.table import Table
 
 if __name__ == "__main__":
 
     id = int(sys.argv[1])
     catalog = Table.read('./data/master_table.fits')
-    cluster = Cluster(catalog[id])
+    cluster = Extractor(catalog[id])
 
     cluster.extract_profile()
     cluster.fit_model()
-    cluster.model_mcmc(n_samples=1000)
-    cluster.ps2D()
+    cluster.model_posterior_sample(n_samples=1000)
+    cluster.extract_ps()
     cluster.ps_mcmc(n_samples=100)
     cluster.fit_P3D()
 
