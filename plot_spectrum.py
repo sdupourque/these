@@ -18,14 +18,20 @@ name_list = []
 for cluster in catalog:
 
     try:
-
+        k, ps2d = np.loadtxt('power_spectrum/ps2d_{}.txt'.format(cluster['NAME']))
+        cov = np.loadtxt('power_spectrum/pscov_{}.txt'.format(cluster['NAME']))
         k_in, norm, alpha = np.loadtxt('power_spectrum/res_{}.txt'.format(cluster['NAME']))
+        if True:#np.max(ps2d) < 1e4 and norm < -8 and alpha <6:
+            norm_list.append(norm)
+            k_in_list.append(k_in)
+            alpha_list.append(alpha)
+            name_list.append(cluster['NAME'])
 
-        norm_list.append(norm)
-        k_in_list.append(k_in)
-        alpha_list.append(alpha)
-        name_list.append(cluster['NAME'])
-
+        else:
+            norm_list.append(np.nan)
+            k_in_list.append(np.nan)
+            alpha_list.append(np.nan)
+            name_list.append(cluster['NAME'])
     except:
 
         pass
@@ -44,7 +50,6 @@ fig = plt.figure(figsize=(4, 4))
 for cluster in catalog:
     try:
         k, ps2d = np.loadtxt('power_spectrum/ps2d_{}.txt'.format(cluster['NAME']))
-        ps2d = np.abs(ps2d)
         cov = np.loadtxt('power_spectrum/pscov_{}.txt'.format(cluster['NAME']))
         plt.plot(k, ps2d, color='black', alpha=0.1)
 
@@ -106,6 +111,7 @@ for cluster in catalog:
     try:
         k, ps2d = np.loadtxt('power_spectrum/ps2d_{}.txt'.format(cluster['NAME']))
         ps2d = np.abs(ps2d)
+
         cov = np.loadtxt('power_spectrum/pscov_{}.txt'.format(cluster['NAME']))
 
         if cluster['TAG'] == 'XCOP':
@@ -157,30 +163,30 @@ plt.savefig('figures/p2d_lpsz.png', transparent=True, dpi=600)
 plt.show()
 
 #%%
-fig = plt.figure(figsize=(4, 4))
+fig = plt.figure(figsize=(3, 3))
 for cluster in catalog:
     try:
         k, ps2d = np.loadtxt('power_spectrum/ps2d_{}.txt'.format(cluster['NAME']))
         ps2d = np.abs(ps2d)
         cov = np.loadtxt('power_spectrum/pscov_{}.txt'.format(cluster['NAME']))
-        plt.plot(k*cluster['R500'], ps2d, color='black', alpha=0.1)
 
-
-        if cluster['TAG'] == 'XCOP':
-            plt.fill_between(k * cluster['R500'],
-                                 (ps2d-np.diag(cov)**0.5),
-                                 (ps2d+np.diag(cov)**0.5),
-                                 alpha=0.05, color='blue')
-        if cluster['TAG'] == 'CHEXMATE':
-            plt.fill_between(k * cluster['R500'],
-                                 (ps2d-np.diag(cov)**0.5),
-                                 (ps2d+np.diag(cov)**0.5),
-                                 alpha=0.05, color='red')
-        if cluster['TAG'] == 'LPSZ':
-            plt.fill_between(k * cluster['R500'],
-                                 (ps2d-np.diag(cov)**0.5),
-                                 (ps2d+np.diag(cov)**0.5),
-                                 alpha=0.05, color='green')
+        if np.max(ps2d) < 1e4:
+            plt.plot(k*cluster['R500'], ps2d, color='black', alpha=0.1)
+            if cluster['TAG'] == 'XCOP':
+                plt.fill_between(k * cluster['R500'],
+                                     (ps2d-np.diag(cov)**0.5),
+                                     (ps2d+np.diag(cov)**0.5),
+                                     alpha=0.05, color='blue')
+            if cluster['TAG'] == 'CHEXMATE':
+                plt.fill_between(k * cluster['R500'],
+                                     (ps2d-np.diag(cov)**0.5),
+                                     (ps2d+np.diag(cov)**0.5),
+                                     alpha=0.05, color='red')
+            if cluster['TAG'] == 'LPSZ':
+                plt.fill_between(k * cluster['R500'],
+                                     (ps2d-np.diag(cov)**0.5),
+                                     (ps2d+np.diag(cov)**0.5),
+                                     alpha=0.05, color='green')
 
     except:
         pass
@@ -203,8 +209,6 @@ for cluster in catalog:
         k, ps2d = np.loadtxt('power_spectrum/ps2d_{}.txt'.format(cluster['NAME']))
         ps2d = np.abs(ps2d)
         cov = np.loadtxt('power_spectrum/pscov_{}.txt'.format(cluster['NAME']))
-
-
 
         A2d = np.sqrt(2*np.pi*k**2*ps2d)
         dA2d = 2*np.sqrt(2 * np.pi * k ** 2 / ps2d)
@@ -270,7 +274,7 @@ plt.show()
 
 #%%
 import matplotlib.colors as colors
-fig, axarr = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(4, 4))
+fig, axarr = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(3, 3))
 
 norm1=colors.Normalize(vmin=min(catalog['alpha']),vmax=max(catalog['alpha']))
 mp1 = axarr[0].scatter(xcop['REDSHIFT'], xcop['R500'], c=xcop['alpha'],marker="o", label='XCOP', norm=norm1)

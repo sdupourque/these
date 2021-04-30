@@ -1,15 +1,15 @@
 import numpy as np
 from astropy.io import fits
-from turbulence_analysis.cluster import Cluster
+from turb.extract_ps import Extractor
 import matplotlib.pyplot as plt
-from turbulence_analysis import graph
+from turb import graph
 from astropy.table import Table
 
 #id = 22
-id = 15
-#id = 15
+id = 17
+
 catalog = Table.read('./data/master_table.fits')
-cluster = Cluster(catalog[id])
+cluster = Extractor.from_catalog_row(catalog[id])
 
 cluster.extract_profile()
 cluster.fit_model()
@@ -17,10 +17,10 @@ cluster.fit_model()
 cluster.prof.Plot(model=cluster.mod)
 plt.show()
 
-cluster.model_mcmc(n_samples=100)
-cluster.ps2D()
+cluster.model_posterior_sample(n_samples=100)
+cluster.extract_ps()
 cluster.ps_mcmc(n_samples=10)
-#cluster.fit_P3D()
+cluster.fit_P3D()
 
 #%%
 from matplotlib.colors import SymLogNorm, LogNorm
