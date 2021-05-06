@@ -5,7 +5,10 @@ import emcee
 from tqdm import tqdm
 from astropy.io import fits
 from scipy.special import gamma
-from .project_ps import EtaBetaModel, P3D_to_P2D, FitterPS,ChiSquared_P3D
+from .project_ps import EtaBetaModel, P3D_to_P2D, FitterPS, ChiSquared_P3D
+from .graphics import dashboard
+from .util import PSF_XMM_ft
+from .project_model import BetaModel
 from astropy.cosmology import FlatLambdaCDM
 
 cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
@@ -16,7 +19,11 @@ class Extractor:
 
         self.name = kwargs.get('NAME')
         self.sample = kwargs.get('SAMPLE')
-        self.path = kwargs.get('PATH')
+        self.analysis_path = kwargs.get('analysis_path', kwargs.get('PATH'))
+        self.dump_path = os.path.join(self.analysis_path, 'clusters/{}'.format(self.name))
+        self.mask_path = os.path.join(self.dump_path, 'mask.fits')
+        self.outmod_path = os.path.join(self.dump_path, 'outmod_{}.fits'.format(self.name))
+
         self.datalink = os.path.join(kwargs.get('PATH'), kwargs.get('datalink_X'))
         self.explink = os.path.join(kwargs.get('PATH'), kwargs.get('explink_X'))
         self.bkglink = os.path.join(kwargs.get('PATH'), kwargs.get('bkglink_X'))
@@ -36,40 +43,56 @@ class Extractor:
         self.fitobj = None
 
     @classmethod
-    def from_catalog_row(class_object, row):
+    def from_catalog_row(class_object, row, **kwargs):
 
         row_dict = dict(zip(row.colnames, row))
-        return class_object(**row_dict)
+        return class_object(**row_dict, **kwargs)
 
     def load_data(self):
 
-        self.dat = pyproffit.Data(self.datalink, explink=self.explink, bkglink=self.bkglink)
+        self.dat = pyproffit.Data(self.datalink,
+                                  explink=self.explink,
+                                  bkglink=self.bkglink)
+
         self.wcs = self.dat.wcs_inp
         self.dat.region(self.reg)
         self.nscales = 10
 
     def extract_profile(self):
 
-        self.prof = pyproffit.Profile(self.dat, center_choice='centroid', centroid_region=self.t500/2, center_ra=self.ra, center_dec=self.dec, maxrad=self.t500, binsize=10., cosmo=cosmo)
-        self.prof.SBprofile(ellipse_ratio=self.prof.ellratio, rotation_angle=self.prof.ellangle % 180)
+        self.prof = pyproffit.Profile(self.dat,
+                                      center_choice='centroid',
+                                      centroid_region=self.t500/2,
+                                      center_ra=self.ra,
+                                      center_dec=self.dec,
+                                      maxrad=2*self.t500,
+                                      binsize=10.,
+                                      cosmo=cosmo)
+
+        self.prof.SBprofile(ellipse_ratio=self.prof.ellratio,
+                            rotation_angle=self.prof.ellangle % 180)
 
     def fit_model(self):
+
+        self.fitobj = pyproffit.Fitter(model=self.mod,
+                                       profile=self.prof)
 
         beta = 2/3
         rc = 2
         norm = np.log10(self.prof.profile.max()/(rc)/(np.sqrt(np.pi)*gamma(3*beta-1/2)/gamma(3*beta)))
         bkg = np.log10(self.prof.profile.min())
-
-        self.fitobj = pyproffit.Fitter(model=self.mod, profile=self.prof)
         self.fitobj.Migrad(beta=beta,
                            rc=rc,
                            norm=norm,
                            bkg=bkg,
-                           limit_rc=(0, 10),
-                           limit_bkg=(-20,0))
+                           limit_beta=(0,20),
+                           limit_rc=(0, 20),
+                           limit_bkg=(-20, 0))
+
+
         self.model_best_fit = self.mod.params.copy()
         self.outmod()
-        self.model_best_fit_image = fits.getdata('outmod_{}.fits'.format(self.name), memmap = False)
+        self.model_best_fit_image = fits.getdata(self.outmod_path, memmap = False)
 
     def model_posterior_sample(self, n_samples=1000):
 
@@ -82,8 +105,8 @@ class Extractor:
 
             return res
 
-        ndim, nwalkers = self.mod.npar, 8
-        pos = [self.mod.params + 1e-4 * np.random.randn(ndim) for i in range(nwalkers)]
+        ndim, nwalkers = self.mod.npar, 3*self.mod.npar
+        pos = [self.mod.params + 1e-3 * np.random.randn(ndim) for _ in range(nwalkers)]
 
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob)
         sampler.run_mcmc(pos, n_samples, progress=True)
@@ -96,10 +119,13 @@ class Extractor:
 
         if params is not None:
             self.mod.SetParameters(params)
-            self.prof.SaveModelImage('outmod_{}.fits'.format(self.name), model=self.mod)
+            self.prof.SaveModelImage(self.outmod_path,
+                                     model=self.mod)
             self.mod.SetParameters(self.model_best_fit)
+
         else:
-            self.prof.SaveModelImage('outmod_{}.fits'.format(self.name), model=self.mod)
+            self.prof.SaveModelImage(self.outmod_path,
+                                     model=self.mod)
 
     def extract_ps(self, nscales=10):
 
@@ -108,19 +134,19 @@ class Extractor:
                                                      nscales=nscales,
                                                      cosmo=cosmo)
 
-        psc.MexicanHat(modimg_file='outmod_{}.fits'.format(self.name),
+        psc.MexicanHat(modimg_file=self.outmod_path,
                        z=self.z,
                        region_size=self.ps_region_size,
                        factshift=1.5,
-                       path= self.path,
+                       path= self.dump_path,
                        poisson = True)
 
         psc.PS(z=self.z,
                region_size=self.ps_region_size,
                radius_out=self.r500 / 1000,
-               path=self.path)
+               path=self.dump_path)
 
-        return np.copy(psc.ps), np.copy(psc.psnoise), np.copy(psc.k)
+        return np.copy(psc.ps), np.copy(psc.psnoise), np.copy(psc.k), psc
 
     def ps_posterior_sample(self, n_samples=100):
 
@@ -129,18 +155,20 @@ class Extractor:
 
         for i in tqdm(range(n_samples)):
 
-            self.outmod(params=self.model_samples[-(i+1), :])
+            if self.mod is not None:
+                self.outmod(params=self.model_samples[-(i+1), :])
 
-            ps, psnoise, k = self.extract_ps()
+            ps, psnoise, self.k, self.psc = self.extract_ps()
 
             self.ps_samples.append(ps)
             self.ps_noise_samples.append(psnoise)
 
-        self.k = k
         self.ps = np.median(self.ps_samples, axis=0)
         self.ps_cov_poisprof = np.cov(self.ps_samples, rowvar=False)
         self.ps_cov_sample = np.diag((self.ps ** 2) / 3)
         self.ps_covariance = self.ps_cov_poisprof + self.ps_cov_sample
+        self.ps_noise = np.median(self.ps_noise_samples, axis=0)
+        self.ps_noise_covariance = np.cov(self.ps_noise_samples, rowvar=False)
 
     def doit(self, **kwargs):
 
@@ -153,13 +181,34 @@ class Extractor:
         self.extract_profile()
 
         if self.mod is not None:
-            self.fit_model()
 
-        self.model_posterior_sample(n_samples=kwargs.get('model_samples', 1000))
-        self.ps_posterior_sample(n_samples=kwargs.get('model_samples', 10))
+            if self.mod == 'BetaModel':
+                self.mod = BetaModel()
+
+            self.fit_model()
+            self.model_posterior_sample(n_samples=kwargs.get('model_samples', 1000))
+
+        else:
+            self.outmod()
+            self.model_best_fit_image = fits.getdata(self.outmod_path, memmap=False)
+
+        self.ps_posterior_sample(n_samples=kwargs.get('ps_samples', 10))
+        self.psf_k_cut = PSF_XMM_ft(cosmo, self.z).k_cut
+
+        dashboard(self, outfile=os.path.join(self.dump_path, self.name + '.html'))
+        
+        del self.dat
+        del self.prof
+        del self.mod
+        del self.fitobj
+
+        return True
 
     def ps_mcmc(self, n_samples=100):
-        """Separate sampling for the two error sources"""
+        """
+        Separate sampling for the two error sources
+        """
+        print('WARNING:DEPRECATED')
         self.ps_samples_poisson = []
         self.ps_samples_profile = []
         self.ps_noise_samples = []
@@ -173,10 +222,10 @@ class Extractor:
                            z=self.z,
                            region_size=self.ps_region_size,
                            factshift=1.5,
-                           path=self.path,
+                           path=self.conv_path,
                            poisson=False)
 
-            psc.PS(z=self.z, region_size=self.ps_region_size, radius_out=self.r500 / 1000, path=self.path)
+            psc.PS(z=self.z, region_size=self.ps_region_size, radius_out=self.r500 / 1000, path=self.conv_path)
 
             self.ps_samples_profile.append(np.abs(np.copy(psc.ps)))
 
@@ -189,10 +238,10 @@ class Extractor:
                            z=self.z,
                            region_size=self.ps_region_size,
                            factshift=1.5,
-                           path=self.path,
+                           path=self.conv_path,
                            poisson=True)
 
-            psc.PS(z=self.z, region_size=self.ps_region_size, radius_out=self.r500 / 1000, path=self.path)
+            psc.PS(z=self.z, region_size=self.ps_region_size, radius_out=self.r500 / 1000, path=self.conv_path)
 
             self.ps_samples_poisson.append(np.abs(np.copy(psc.ps)))
             self.ps_noise_samples.append(np.abs(np.copy(psc.psnoise)))
