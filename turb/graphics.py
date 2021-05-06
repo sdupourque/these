@@ -1,17 +1,16 @@
 import numpy as np
-import PIL
-import io
-from corner import corner
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from plotly.offline import plot
 from plotly.subplots import make_subplots
+from astropy.table import Table
 from itertools import combinations
-from skimage.transform import downscale_local_mean
+import os
+import plotly.express as px
 
 #%%
 def images_expo(cluster):
+
     cbarlocs = [.285, .64, .995]
 
     img = cluster.dat.img.copy()
@@ -24,13 +23,7 @@ def images_expo(cluster):
     img[index] = np.nan
     exp[index] = np.nan
     bkg[index] = np.nan
-    #downrate = 3
-    #downrate = 3
-    #img = img[::downrate, ::downrate]
-    #bkg = bkg[::downrate, ::downrate]
-    #exp = exp[::downrate, ::downrate]
-    #ra = ra[::downrate, ::downrate]
-    #dec = dec[::downrate, ::downrate]
+
     ra = ra[:,ra.shape[1]//2]
     dec = dec[dec.shape[0]//2,:]
 
@@ -97,21 +90,12 @@ def images_expo(cluster):
         marker_color="white"
     ), row=1, col="all")
 
-    #fig.add_trace(go.Scatter(
-    #    x=x_ell + cluster.prof.cx,
-    #    y=y_ell + cluster.prof.cy,
-    #    name='r500',
-    #    text=['R500 Ellipse']
-    #), row=1, col="all")
-
     fig.update_layout(showlegend=False)
     fig.update_layout(autosize = True)
     fig.update_layout(title='Raw inputs')
-    fig.update_xaxes(#showgrid=False,
-                     zeroline=False,
+    fig.update_xaxes(zeroline=False,
                      showticklabels=False)
-    fig.update_yaxes(#showgrid=False,
-                     zeroline=False,
+    fig.update_yaxes(zeroline=False,
                      showticklabels=False)
 
     return plot(fig, include_mathjax='cdn', output_type='div')
@@ -121,9 +105,6 @@ def profile(cluster):
 
     rads = cluster.prof.bins
     prof = cluster.prof.profile
-
-    tmod = cluster.mod(rads, *cluster.mod.params)
-    chi = (prof-cluster.mod(rads, *cluster.mod.params))/cluster.prof.eprof
 
     fig = make_subplots(rows=2, cols=2,shared_xaxes=True,
                         row_width=[0.2, 0.8],
@@ -144,13 +125,6 @@ def profile(cluster):
                                          visible=True),
                             row=1, col=1)
 
-    fig.add_scatter(x=rads, y=tmod, name='BetaModel', row=1, col=1,
-                    error_x=dict(type='data',
-                                 array=cluster.prof.ebins,
-                                 visible=True,
-                                 thickness=0.),
-                    )
-
     fig.add_scatter(x=rads, y=cluster.prof.bkgprof, name='Background', row=1, col=1,
                     error_x=dict(type='data',
                                  array=cluster.prof.ebins,
@@ -158,11 +132,21 @@ def profile(cluster):
                                  thickness=0.),
                     )
 
-    fig.add_trace(go.Scatter(x=rads, y=chi, mode='markers', name=r'$\chi$',
-                            error_y=dict(type='data',
-                                         array=np.ones(len(rads)),
-                                         visible=True)),
-                            row=2, col=1)
+    if cluster.mod is not None:
+        tmod = cluster.mod(rads, *cluster.mod.params)
+        chi = (prof - cluster.mod(rads, *cluster.mod.params)) / cluster.prof.eprof
+        fig.add_scatter(x=rads, y=tmod, name='BetaModel', row=1, col=1,
+                        error_x=dict(type='data',
+                                     array=cluster.prof.ebins,
+                                     visible=True,
+                                     thickness=0.),
+                        )
+
+        fig.add_trace(go.Scatter(x=rads, y=chi, mode='markers', name=r'$\chi$',
+                                 error_y=dict(type='data',
+                                              array=np.ones(len(rads)),
+                                              visible=True)),
+                      row=2, col=1)
 
     fig.update_xaxes(type="log", row=1,col=1)
     fig.update_yaxes(type="log", title_text=r'$\text{Surface Brightness } [\text{cts }.\text{s}^{-1}.\text{arcmin}^2]$', automargin=True,row=1,col=1)
@@ -178,13 +162,14 @@ def profile(cluster):
         )
     )
 
-    bestmod = cluster.model_best_fit_image
+    bestmod = cluster.model_best_fit_image.copy()
     exp = cluster.dat.exposure.copy()
     ra, dec = cluster.wcs.all_pix2world(*np.indices(cluster.dat.img.shape), 0)
+
     ra = ra[:, ra.shape[1] // 2]
     dec = dec[dec.shape[0] // 2, :]
 
-    bestmod[exp==0] = np.nan
+    bestmod[exp == 0] = np.nan
 
     fig.add_trace(
         go.Heatmap(x=ra,
@@ -210,7 +195,7 @@ def profile(cluster):
     c, s = np.cos(angle), np.sin(angle)
     R = np.array(((c, -s), (s, c)))
 
-    x_f,y_f = np.dot(R,np.vstack((x,y)))
+    x_f, y_f = np.dot(R, np.vstack((x, y)))
     x_f += x0
     y_f += y0
 
@@ -221,12 +206,11 @@ def profile(cluster):
                              line_color='#17becf'),
                   row=1, col=2)
 
-    fig.update_xaxes(#showgrid=False,
-                     zeroline=False,
+    fig.update_xaxes(zeroline=False,
                      showticklabels=False,
                      row=1, col=2)
-    fig.update_yaxes(#showgrid=False,
-                     zeroline=False,
+
+    fig.update_yaxes(zeroline=False,
                      showticklabels=False,
                      row=1, col=2)
 
@@ -247,8 +231,8 @@ def profile(cluster):
 #%%
 def power_spectrum(cluster):
 
-    k = cluster.psc.k
-    ps2d = cluster.psc.ps
+    k = cluster.k
+    ps2d = cluster.ps
 
     fig = make_subplots(rows=2, cols=2,shared_xaxes=True,
                         row_width=[0.2, 0.8],
@@ -260,13 +244,13 @@ def power_spectrum(cluster):
                         subplot_titles=('2D Power Spectrum', 'Fluctuation map'),
                         )
 
-    fig.add_trace(go.Scatter(x=k, y=ps2d - np.diag(cluster.ps_covariance) ** 0.5,
+    fig.add_trace(go.Scatter(x=k, y=ps2d - np.diag(cluster.ps_covariance)**0.5,
                              fill=None,
                              line_color='#636efa',
                              mode='lines'
                              ))
 
-    fig.add_trace(go.Scatter(x=k, y=ps2d+np.diag(cluster.ps_covariance)**0.5,
+    fig.add_trace(go.Scatter(x=k, y=ps2d + np.diag(cluster.ps_covariance)**0.5,
                              fill='tonexty',
                              line_color='#636efa',
                              mode='lines'  # override default markers+lines
@@ -277,39 +261,26 @@ def power_spectrum(cluster):
                     mode='lines',
                     line_color='blue')
 
-    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_profile)**0.5,
-                    name='Err-Profile',
+    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_poisprof)**0.5,
+                    name='Err-Profile/Poisson',
                     mode='lines',
                     line_dash='dot',
                     line_color='red')
 
-    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_poisson)**0.5,
-                    name='Err-Poisson',
-                    mode='lines',
-                    line_dash = 'dot',
-                    line_color='green')
+    #fig.add_scatter(x=np.geomspace(min(k), max(k), 100),
+    #                y=cluster.model_P3D(np.geomspace(min(k), max(k), 100), *cluster.res),
+    #                name='Best fit',
+    #                mode='lines',
+    #                line_color='cyan', row=1, col=1)
 
-    fig.add_scatter(x=k, y=np.diag(cluster.ps_cov_sample) ** 0.5,
-                    name='Err-Sample',
-                    mode='lines',
-                    line_dash='dot',
-                    line_color='purple')
+    #chi = (ps2d - cluster.model_P3D(k, *cluster.res)) / (2*np.diag(cluster.ps_covariance)**0.5)
 
-
-    fig.add_scatter(x=np.geomspace(min(k), max(k), 100),
-                    y=cluster.model_P3D(np.geomspace(min(k), max(k), 100), *cluster.res),
-                    name='Best fit',
-                    mode='lines',
-                    line_color='cyan', row=1, col=1)
-
-    chi = (ps2d - cluster.model_P3D(cluster.psc.k, *cluster.res)) / (2*np.diag(cluster.ps_covariance)**0.5)
-
-    fig.add_scatter(x=k, y=chi, name=r'$\chi$', mode='markers',
-                    marker_color='#AB63FA',
-                    error_y=dict(type='data',
-                                 array=np.ones(len(cluster.psc.k)),
-                                 visible=True),
-                    row=2, col=1)
+    #fig.add_scatter(x=k, y=chi, name=r'$\chi$', mode='markers',
+    #                marker_color='#AB63FA',
+    #                error_y=dict(type='data',
+    #                             array=np.ones(len(cluster.psc.k)),
+    #                             visible=True),
+    #                row=2, col=1)
 
     fig.update_xaxes(type="log", col=1, row=1)
     fig.update_yaxes(type="log", title_text=r'$\text{Power Spectrum (2D) } [\text{cts }.\text{s}^{-1}.\text{arcmin}^2]$',
@@ -326,14 +297,16 @@ def power_spectrum(cluster):
         )
     )
 
-    bestmod = cluster.model_best_fit_image
+    img = cluster.dat.img.copy()
+    bestmod = cluster.model_best_fit_image.copy()
     exp = cluster.dat.exposure.copy()
     ra, dec = cluster.wcs.all_pix2world(*np.indices(cluster.dat.img.shape), 0)
+
     ra = ra[:, ra.shape[1] // 2]
     dec = dec[dec.shape[0] // 2, :]
 
     bestmod[exp == 0] = np.nan
-    img = cluster.dat.img
+
     normalized_img = np.log10(img/bestmod)
     normalized_img[np.isnan(normalized_img)] = 0
     normalized_img[np.isinf(normalized_img)] = 0
@@ -411,9 +384,20 @@ def power_spectrum(cluster):
 
 #%%
 def profile_table(cluster):
-    fig = go.Figure(data=[go.Table(header=dict(values=['Ellipse angle', 'Ellipse ratio', *cluster.mod.parnames]),
+
+    if cluster.mod is not None:
+
+        fig = go.Figure(data=[go.Table(header=dict(values=['Ellipse angle', 'Ellipse ratio', *cluster.mod.parnames]),
                                    cells=dict(values=[round(cluster.prof.ellangle,2), round(cluster.prof.ellratio,4), *np.round(cluster.model_best_fit, decimals=4)]))
                           ])
+
+    else:
+
+        fig = go.Figure(data=[go.Table(header=dict(values=['Ellipse angle', 'Ellipse ratio']),
+                                       cells=dict(
+                                           values=[round(cluster.prof.ellangle, 2), round(cluster.prof.ellratio, 4),
+                                                   ]))
+                              ])
     fig.update_layout(
         height=250
     )
@@ -427,32 +411,8 @@ def ps_table(cluster):
     fig.update_layout(
         height=250
     )
+
     return plot(fig, include_mathjax='cdn', output_type='div')
-
-#%% Corner plot
-def corner_plotly(cluster):
-
-    fig = make_subplots(rows=cluster.mod.npar-1, cols=cluster.mod.npar-1, shared_xaxes=True)
-    df = pd.DataFrame(data=cluster.model_samples, columns=cluster.mod.parnames)
-    for var1, var2 in combinations(cluster.mod.parnames, 2):
-
-        fig.add_trace(go.Histogram2dContour(
-            x=df[var1],
-            y=df[var2],
-            colorscale='Blues',
-            histnorm='probability'
-        ), row=cluster.mod.parnames.index(var2), col=cluster.mod.parnames.index(var1)+1)
-
-    fig.update_traces(showscale=False)
-    fig.update_layout(autosize = True)
-    fig.update_layout(
-        width=1400,
-        height=1000
-    )
-    fig.write_html("corner.html", include_mathjax='cdn')
-
-
-    #return fig
 
 #%%
 def header(cluster):
@@ -473,7 +433,7 @@ def dashboard(cluster, outfile='multi_plot.html'):
     div3 = profile(cluster)
     div4 = profile_table(cluster)
     div5 = power_spectrum(cluster)
-    div6 = ps_table(cluster)
+    #div6 = ps_table(cluster)
 
     html = """\
     <html>
@@ -486,10 +446,69 @@ def dashboard(cluster, outfile='multi_plot.html'):
         {}
         {}
         {}
+        </body>
+    </html>
+    """.format(hdr, div2, div3, div4, div5)
+
+    with open(outfile, 'w') as f:
+        f.write(html)
+
+#%%
+
+def analysis_header(analysis):
+
+    fig = go.Figure(data=[go.Table(header=dict(values=['Name', *analysis.config.keys()]),
+                                   cells=dict(values=[analysis.name, *analysis.config.values()]))
+                          ])
+    fig.update_layout(
+        height=250
+    )
+    return plot(fig, include_mathjax='cdn', output_type='div')
+
+def analysis_spectra(analysis):
+
+    fig = go.Figure()# iris is a pandas DataFrame
+
+    for row in analysis.master_table:
+
+        fig.add_scatter(x=row['k'], y=row['ps'], name=row['NAME'],
+                        legendgroup=row['NAME'],
+                        line_color='#636EFA',
+                        error_y=dict(
+                            type='data',  # value of error bar given in data coordinates
+                            array=np.diag(row['ps_covariance']) ** (1 / 2),
+                            visible=True))
+
+
+        fig.add_scatter(x=row['k'], y=row['ps_noise'], name='{} ps_noise'.format(row['NAME']),
+                        legendgroup=row['NAME'],
+                        line_color='#EF553B')
+
+
+    fig.update_xaxes(type="log",
+                     title_text=r'$k [\text{kpc}^{-1}]$')
+    fig.update_yaxes(type="log",
+                     title_text=r'$\text{Power Spectrum (2D) } [\text{kpc}^{4}]$',
+                     automargin=True)
+
+    return plot(fig, include_mathjax='cdn', output_type='div')
+
+def report(analysis):
+
+    hdr = analysis_header(analysis)
+    div2 = analysis_spectra(analysis)
+
+    html = """\
+    <html>
+        <head>
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        </head>
+        <body>
+        {}
         {}
         </body>
     </html>
-    """.format(hdr, div2, div3, div4, div5, div6)
+    """.format(hdr, div2)
 
-    with open(outfile, 'w') as f:
+    with open(os.path.join(analysis.analysis_path, 'report.html'), 'w') as f:
         f.write(html)
