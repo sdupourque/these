@@ -1,7 +1,7 @@
 import os
 import sys
 import numpy as np
-from turb.graph import dashboard
+from turb.graphics import dashboard
 from turb.extract_ps import Extractor
 from astropy.table import Table
 

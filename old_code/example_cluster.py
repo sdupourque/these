@@ -2,7 +2,7 @@ import numpy as np
 from astropy.io import fits
 from turb.extract_ps import Extractor
 import matplotlib.pyplot as plt
-from turb import graph
+from turb import graphics
 from astropy.table import Table
 
 #id = 22
@@ -106,9 +106,9 @@ plt.show()
 
 #%% 
 from importlib import reload
-reload(graph)
+reload(graphics)
 
-graph.dashboard(cluster)
+graphics.dashboard(cluster)
 
 #%%
 
