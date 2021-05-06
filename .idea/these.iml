@@ -8,6 +8,9 @@
       <excludeFolder url="file://$MODULE_DIR$/XCOP/conv" />
       <excludeFolder url="file://$MODULE_DIR$/data" />
       <excludeFolder url="file://$MODULE_DIR$/notebooks/tmp" />
+      <excludeFolder url="file://$MODULE_DIR$/figures" />
+      <excludeFolder url="file://$MODULE_DIR$/analysis_overview" />
+      <excludeFolder url="file://$MODULE_DIR$/analysis_results" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.8 (these)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
