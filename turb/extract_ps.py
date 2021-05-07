@@ -43,10 +43,10 @@ class Extractor:
         self.fitobj = None
 
     @classmethod
-    def from_catalog_row(class_object, row, **kwargs):
+    def from_catalog_row(cls, row, **kwargs):
 
         row_dict = dict(zip(row.colnames, row))
-        return class_object(**row_dict, **kwargs)
+        return cls(**row_dict, **kwargs)
 
     def load_data(self):
 
@@ -115,7 +115,7 @@ class Extractor:
         self.model_samples = self.model_chains[:, :, :].reshape((-1, ndim))
         self.model_covariance = np.cov(self.model_samples, rowvar=False)
 
-    def outmod(self, params=None):
+    def outmod(self, params=None, median_noise=False):
 
         if params is not None:
             self.mod.SetParameters(params)
@@ -125,13 +125,14 @@ class Extractor:
 
         else:
             self.prof.SaveModelImage(self.outmod_path,
-                                     model=self.mod)
+                                     model=self.mod,
+                                     median_noise=median_noise)
 
-    def extract_ps(self, nscales=10):
+    def extract_ps(self, n_scales=10):
 
         psc = pyproffit.power_spectrum.PowerSpectrum(self.dat,
                                                      self.prof,
-                                                     nscales=nscales,
+                                                     nscales=n_scales,
                                                      cosmo=cosmo)
 
         psc.MexicanHat(modimg_file=self.outmod_path,
@@ -148,7 +149,7 @@ class Extractor:
 
         return np.copy(psc.ps), np.copy(psc.psnoise), np.copy(psc.k), psc
 
-    def ps_posterior_sample(self, n_samples=100):
+    def ps_posterior_sample(self, n_samples=100, n_scales=10):
 
         self.ps_samples = []
         self.ps_noise_samples = []
@@ -157,8 +158,10 @@ class Extractor:
 
             if self.mod is not None:
                 self.outmod(params=self.model_samples[-(i+1), :])
+            else:
+                self.outmod(median_noise=True)
 
-            ps, psnoise, self.k, self.psc = self.extract_ps()
+            ps, psnoise, self.k, self.psc = self.extract_ps(n_scales=n_scales)
 
             self.ps_samples.append(ps)
             self.ps_noise_samples.append(psnoise)
@@ -192,7 +195,7 @@ class Extractor:
             self.outmod()
             self.model_best_fit_image = fits.getdata(self.outmod_path, memmap=False)
 
-        self.ps_posterior_sample(n_samples=kwargs.get('ps_samples', 10))
+        self.ps_posterior_sample(n_samples=kwargs.get('ps_samples', 10), n_scales=kwargs['ps_scales'])
         self.psf_k_cut = PSF_XMM_ft(cosmo, self.z).k_cut
 
         dashboard(self, outfile=os.path.join(self.dump_path, self.name + '.html'))
