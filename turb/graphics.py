@@ -1,10 +1,9 @@
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
 from plotly.offline import plot
 from plotly.subplots import make_subplots
-from astropy.table import Table
-from itertools import combinations
+from plotly.validators.scatter.marker import SymbolValidator
+from itertools import cycle
 import os
 import plotly.express as px
 
@@ -467,7 +466,7 @@ def analysis_header(analysis):
 
 def analysis_spectra(analysis):
 
-    fig = go.Figure()# iris is a pandas DataFrame
+    fig = go.Figure()
 
     for row in analysis.master_table:
 
@@ -511,4 +510,79 @@ def report(analysis):
     """.format(hdr, div2)
 
     with open(os.path.join(analysis.analysis_path, 'report.html'), 'w') as f:
+        f.write(html)
+
+#%%
+def header_compare(*analysis_list):
+
+    parameters = list(analysis_list[0].config.keys())
+    cells_list = []
+
+    for param in parameters:
+        cells_list.append([analysis.config[param] for analysis in analysis_list])
+
+    fig = go.Figure(data=[go.Table(header=dict(values=['Name', *parameters]),
+                                   cells=dict(values=[[analysis.name for analysis in analysis_list],
+                                                *cells_list]))])
+
+    fig.update_layout(
+        height=250
+    )
+
+    return plot(fig, include_mathjax='cdn', output_type='div')
+
+def ps_compare(*analysis_list):
+
+    fig = go.Figure()
+
+    raw_symbols = SymbolValidator().values
+    symbols=['circle', 'square', 'cross', 'triangle', 'star', 'hexagon']
+    symbols = cycle(symbols)
+    for analysis in analysis_list:
+        symbol = next(symbols)
+        colors = cycle(px.colors.qualitative.Plotly)
+        for row in analysis.master_table:
+
+            color = next(colors)
+            fig.add_scatter(x=row['k']*row['R500'], y=row['ps'], name=row['NAME']+' '+analysis.name,
+                        legendgroup=row['NAME'],
+                        line_color=color,
+                        line_width=2,
+                        line_dash='dot',
+                        marker_color=color,
+                        marker_symbol=symbol,
+                        marker_size=7,
+                        opacity=0.8,
+                        marker_line_color="gray",
+                        marker_line_width=2,
+                        error_y=dict(
+                            type='data',  # value of error bar given in data coordinates
+                            array=np.diag(row['ps_covariance']) ** (1 / 2),
+                            visible=True))
+
+    fig.update_xaxes(type="log",
+                     title_text=r'$k/k_{500}$')
+    fig.update_yaxes(type="log",
+                     title_text=r'$\text{Power Spectrum (2D) } [\text{kpc}^{4}]$',
+                     automargin=True)
+
+    return plot(fig, include_mathjax='cdn', output_type='div')
+
+def compare(*analysis_list):
+
+    hdr = header_compare(*analysis_list)
+    div2 = ps_compare(*analysis_list)
+    html = """\
+        <html>
+            <head>
+                <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            </head>
+            <body>
+            {}
+            {}
+            </body>
+        </html>
+        """.format(hdr, div2)
+
+    with open(os.path.join('analysis_results', 'compare.html'), 'w') as f:
         f.write(html)
