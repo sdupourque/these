@@ -80,7 +80,7 @@ class Extractor:
         beta = 2/3
         rc = 2
         norm = np.log10(self.prof.profile.max()/(rc)/(np.sqrt(np.pi)*gamma(3*beta-1/2)/gamma(3*beta)))
-        bkg = np.log10(self.prof.profile.min())
+        bkg = np.log10(self.prof.bkgprof.mean())
         self.fitobj.Migrad(beta=beta,
                            rc=rc,
                            norm=norm,
@@ -128,11 +128,11 @@ class Extractor:
                                      model=self.mod,
                                      median_noise=median_noise)
 
-    def extract_ps(self, n_scales=10):
+    def extract_ps(self, **kwargs):
 
         psc = pyproffit.power_spectrum.PowerSpectrum(self.dat,
                                                      self.prof,
-                                                     nscales=n_scales,
+                                                     nscales=kwargs.get('n_scales', 10),
                                                      cosmo=cosmo)
 
         psc.MexicanHat(modimg_file=self.outmod_path,
@@ -144,24 +144,24 @@ class Extractor:
 
         psc.PS(z=self.z,
                region_size=self.ps_region_size,
-               radius_out=self.r500 / 1000,
+               radius_in = self.r500 / 2 / 1000,
+               radius_out = self.r500 / 1000,
                path=self.dump_path)
 
         return np.copy(psc.ps), np.copy(psc.psnoise), np.copy(psc.k), psc
 
-    def ps_posterior_sample(self, n_samples=100, n_scales=10):
+    def ps_posterior_sample(self, **kwargs):
 
         self.ps_samples = []
         self.ps_noise_samples = []
 
-        for i in tqdm(range(n_samples)):
-
+        for i in tqdm(range(kwargs.get('n_samples', 10))):
             if self.mod is not None:
                 self.outmod(params=self.model_samples[-(i+1), :])
             else:
                 self.outmod(median_noise=True)
 
-            ps, psnoise, self.k, self.psc = self.extract_ps(n_scales=n_scales)
+            ps, psnoise, self.k, self.psc = self.extract_ps(**kwargs)
 
             self.ps_samples.append(ps)
             self.ps_noise_samples.append(psnoise)
@@ -195,7 +195,10 @@ class Extractor:
             self.outmod()
             self.model_best_fit_image = fits.getdata(self.outmod_path, memmap=False)
 
-        self.ps_posterior_sample(n_samples=kwargs.get('ps_samples', 10), n_scales=kwargs['ps_scales'])
+        self.ps_posterior_sample(n_samples=kwargs.get('ps_samples', 10),
+                                 n_scales=kwargs.get('ps_scales',10)
+                                 )
+
         self.psf_k_cut = PSF_XMM_ft(cosmo, self.z).k_cut
 
         dashboard(self, outfile=os.path.join(self.dump_path, self.name + '.html'))
