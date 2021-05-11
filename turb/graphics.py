@@ -310,6 +310,8 @@ def power_spectrum(cluster):
     normalized_img[np.isnan(normalized_img)] = 0
     normalized_img[np.isinf(normalized_img)] = 0
 
+    normalized_img[np.isnan(normalized_img)]
+
     region_var = np.zeros_like(img)
     region_var[cluster.psc.region_var] = 1.
     #normalized_img[exp == 0] = np.nan
@@ -328,18 +330,18 @@ def power_spectrum(cluster):
                    colorbar_x=.995,
                    ), row=1, col=2)
 
-    fig.add_trace(
-        go.Heatmap(x=ra,
-                   y=dec,
-                   z=region_var,
-                   hoverongaps=False,
-                   name="var_region",
-                   text=['Var region'],
-                   colorscale='PiYG',
-                   opacity=0.1,
-                   hoverinfo='skip',
-                   showscale=False
-                   ), row=1, col=2)
+    #fig.add_trace(
+    #    go.Heatmap(x=ra,
+    #               y=dec,
+    #               z=region_var,
+    #               hoverongaps=False,
+    #               name="var_region",
+    #               text=['Var region'],
+    #               colorscale='PiYG',
+    #               opacity=0.1,
+    #               hoverinfo='skip',
+    #               showscale=False
+    #               ), row=1, col=2)
 
     ymin, ymax, xmin, xmax = cluster.psc.rectangle_conv
     if xmax==cluster.dat.axes[0]: xmax -=1
@@ -525,10 +527,6 @@ def header_compare(*analysis_list):
                                    cells=dict(values=[[analysis.name for analysis in analysis_list],
                                                 *cells_list]))])
 
-    fig.update_layout(
-        height=250
-    )
-
     return plot(fig, include_mathjax='cdn', output_type='div')
 
 def ps_compare(*analysis_list):
@@ -536,7 +534,7 @@ def ps_compare(*analysis_list):
     fig = go.Figure()
 
     raw_symbols = SymbolValidator().values
-    symbols=['circle', 'square', 'cross', 'triangle', 'star', 'hexagon']
+    symbols=['circle', 'square', 'cross', 'star-triangle-up', 'star', 'hexagon']
     symbols = cycle(symbols)
     for analysis in analysis_list:
         symbol = next(symbols)
@@ -553,12 +551,23 @@ def ps_compare(*analysis_list):
                         marker_symbol=symbol,
                         marker_size=7,
                         opacity=0.8,
-                        marker_line_color="gray",
+                        marker_line_color="black",
                         marker_line_width=2,
                         error_y=dict(
                             type='data',  # value of error bar given in data coordinates
                             array=np.diag(row['ps_covariance']) ** (1 / 2),
                             visible=True))
+
+            fig.add_scatter(x=row['k'] * row['R500'], y=row['ps_noise'], name=row['NAME'] + ' PS_noise ' + analysis.name,
+                            legendgroup=row['NAME'],
+                            line_color='gray',
+                            line_width=2,
+                            line_dash='dash',
+                            opacity=0.2,
+                            error_y=dict(
+                                type='data',  # value of error bar given in data coordinates
+                                array=np.diag(row['ps_noise_covariance']) ** (1 / 2),
+                                visible=True))
 
     fig.update_xaxes(type="log",
                      title_text=r'$k/k_{500}$')
@@ -582,7 +591,7 @@ def compare(*analysis_list):
             {}
             </body>
         </html>
-        """.format(hdr, div2)
+        """.format(div2, hdr)
 
     with open(os.path.join('analysis_results', 'compare.html'), 'w') as f:
         f.write(html)
